@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     zlib1g-dev \
     libreadline-dev \
-    libsqlite3-dev \
+    libsqlite3-dev \ 
     libffi-dev \
     liblzma-dev \
     wget \
@@ -53,11 +53,11 @@ COPY ./setup.py ./setup.py
 RUN poetry install
 
 
-RUN dpkg --unpack hailort_requirements_files/hailort-pcie-driver_4.21.0_all.deb
-RUN dpkg --unpack hailort_requirements_files/hailort_4.21.0_arm64.deb
+RUN dpkg --unpack hailort_requirements_files/hailort-pcie-driver_4.20.0_all.deb
+RUN dpkg --unpack hailort_requirements_files/hailort_4.20.0_arm64.deb
 
 ENV PATH="/home/wyoming_hailo_whisper/.venv/bin:$PATH"
-RUN poetry run pip install hailort_requirements_files/hailort-4.21.0-cp311-cp311-linux_aarch64.whl
+RUN poetry run pip install hailort_requirements_files/hailort-4.20.0-cp311-cp311-linux_aarch64.whl
 
 RUN ./download_resources.sh
 

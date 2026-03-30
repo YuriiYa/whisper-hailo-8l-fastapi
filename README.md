@@ -4,12 +4,12 @@
 It was created and tested on:
 - Raspberry Pi 5 8Gb ORM 
 - Ubuntu Server 25.04
-- HailoRT v4.21
+- HailoRT v4.20
 - Hailo8L
 
 ### Requirements
 - Hailo8 / Hailo8L
-- HailoRT 4.21 (not tested on 4.20)
+- HailoRT 4.20
 - HailoRT PCIe driver
 - PyHailoRT (.whl file; Can be downloaded https://hailo.ai/developer-zone/software-downloads; You need file HailoRT – Python package (whl) for Python 3.11, aarch64)
 - Python 3.11.*
@@ -31,7 +31,7 @@ You need to install all requirements from official documentation.
 
 Some files from the `developer-zone` that need to be installed are located in hailort_requirements_files folder
 
-https://hailo.ai/developer-zone/documentation/hailort-v4-21-0/?sp_referrer=install/install.html
+https://hailo.ai/developer-zone/documentation/hailort-v4-20-0/?sp_referrer=install/install.html
 
 ### Installation
 1. Clone repository
@@ -52,7 +52,7 @@ https://hailo.ai/developer-zone/documentation/hailort-v4-21-0/?sp_referrer=insta
 
 4. Install .whl in environment
     ```shell
-    pip install hailort_requirements_files/hailort-4.21.0-cp311-cp311-linux_aarch64.whl
+    pip install hailort_requirements_files/hailort-4.20.0-cp311-cp311-linux_aarch64.whl
     ```
    
     The PyHailoRT version must match the installed HailoRT version. NOTE: This step is not necessary for Raspberry Pi 5 users who installed the hailo-all package, since the venv will inherit the system package.
