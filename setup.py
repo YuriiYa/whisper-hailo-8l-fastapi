@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import argparse
+import re
 
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 VENV_DIR = os.path.join(ROOT_DIR, ".venv")
@@ -17,13 +18,13 @@ def create_venv():
     """Creates a virtual environment if it doesn't exist."""
     if not os.path.exists(VENV_DIR):
         print(f"Creating virtual environment in {VENV_DIR}...")
-        run_command(f"poetry install")
+        run_command(f"{sys.executable} -m venv {VENV_DIR}")
     else:
         print("Virtual environment already exists.")
 
     # Upgrade pip to the latest version
     print("\nUpgrading pip inside the virtual environment...")
-    run_command(f"poetry run {PIP_BIN} install --upgrade pip wheel setuptools")
+    run_command(f"{PIP_BIN} install --upgrade pip wheel setuptools")
 
 def download_resources():
     try:
@@ -41,7 +42,33 @@ def install_requirements(develop_install=False):
         print("\nInstalling dependencies from requirements_inference.txt...")
         run_command(f"{PIP_BIN} install -r {requirements_inference_file}")
     else:
-        print("No requirements_inference.txt found, skipping package installation.")
+        pyproject_file = os.path.join(ROOT_DIR, "pyproject.toml")
+        print(f"\nNo requirements_inference.txt found, installing from {pyproject_file}...")
+        with open(pyproject_file) as f:
+            content = f.read()
+        # Extract the [tool.poetry.dependencies] section
+        match = re.search(r'\[tool\.poetry\.dependencies\](.*?)(\[|\Z)', content, re.DOTALL)
+        if not match:
+            print("Could not find [tool.poetry.dependencies] in pyproject.toml, skipping.")
+            return
+        deps_block = match.group(1)
+        packages = []
+        for line in deps_block.splitlines():
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            # key = "^version" or key = {version = "...", ...}
+            kv = re.match(r'^(\S+)\s*=\s*"([^"]*)"', line)
+            if kv:
+                name, version = kv.group(1), kv.group(2)
+                if name.lower() == 'python':
+                    continue
+                # Convert poetry version constraint to pip specifier
+                pip_version = re.sub(r'^\^', '>=', version)
+                pip_version = re.sub(r'^~', '~=', pip_version)
+                packages.append(f'{name}{pip_version}')
+        if packages:
+            run_command(f"{PIP_BIN} install " + " ".join(f'"{p}"' for p in packages))
 
     download_resources()
 

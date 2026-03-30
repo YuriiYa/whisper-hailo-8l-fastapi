@@ -13,10 +13,11 @@ class HefUtils:
             str: Path to the encoder HEF file.
         """
         base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        hw_arch = (hw_arch or "").upper()
         if hw_arch == "HAILO8L":
             hef_path = os.path.join(base_path, 'infrastructure', 'hefs', 'h8l', 'tiny', 'tiny-whisper-encoder-10s_15dB_h8l.hef')
         else:
-            hef_path = os.path.join(base_path, 'hefs', 'h8', 'tiny', 'tiny-whisper-encoder-10s_15dB.hef')
+            hef_path = os.path.join(base_path, 'infrastructure', 'hefs', 'h8', 'tiny', 'tiny-whisper-encoder-10s_15dB.hef')
         if not os.path.exists(hef_path):
             raise FileNotFoundError(f"Encoder HEF file not found: {hef_path}. Please check the path.")
         return hef_path
@@ -34,11 +35,12 @@ class HefUtils:
             str: Path to the decoder HEF file.
         """
         base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        hw_arch = (hw_arch or "").upper()
         if hw_arch == "HAILO8L":
             hef_path = os.path.join(base_path, 'infrastructure', 'hefs', "h8l", "tiny",
                                     "tiny-whisper-decoder-fixed-sequence-matmul-split_h8l.hef")
         else:
-            hef_path = os.path.join(base_path, "hefs", "h8", "tiny",
+            hef_path = os.path.join(base_path, "infrastructure", "hefs", "h8", "tiny",
                                     "tiny-whisper-decoder-fixed-sequence-matmul-split.hef")
         if not os.path.exists(hef_path):
             raise FileNotFoundError(f"Decoder HEF file not found: {hef_path}. Please check the path.")
