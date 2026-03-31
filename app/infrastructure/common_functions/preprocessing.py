@@ -92,6 +92,7 @@ def improve_input_audio(audio, vad=True, low_audio_gain=True):
             logging.info(f"Speech detected at {start_time:.2f} seconds.")
         else:
             logging.info("No speech detected.")
+            start_time = 0.0
     return audio, start_time
 
 

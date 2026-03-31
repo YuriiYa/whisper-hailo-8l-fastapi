@@ -28,6 +28,9 @@ class TranscribeAudioUseCase:
             sampled_audio = self.audio_utils.load_audio(audio_path)
 
             sampled_audio, start_time = improve_input_audio(sampled_audio, vad=True)
+            if start_time is None:
+                # No speech detected by VAD; process from the beginning instead of crashing.
+                start_time = 0.0
             chunk_offset = start_time - 0.2
             if chunk_offset < 0:
                 chunk_offset = 0

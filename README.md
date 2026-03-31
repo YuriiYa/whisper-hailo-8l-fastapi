@@ -119,3 +119,55 @@ If you have this error, you should reinstall your .venv, because something went 
 [] [] [HailoRT] [info] [async_infer_runner.cpp:86] [shutdown] Pipeline was aborted. Shutting it down
 [] [] [HailoRT] [error] [infer_model.cpp:651] [run_async] CHECK_SUCCESS failed with status=HAILO_INVALID_OPERATION(6)
 ```
+
+
+## Client script: microphone listener and transcriber
+
+The script `client/talk.transkribe.py` continuously records microphone audio,
+sends each chunk to `/transcribe`, and prints the server response.
+If `--save` is provided, it also saves each chunk to a local WAV file.
+
+### Install dependencies
+```shell
+pip install requests numpy sounddevice
+```
+
+### Run
+```shell
+python ./client/talk.transkribe.py --chunk-seconds 10
+```
+
+### What it does
+1. Prints all available audio input devices at startup.
+2. If `--input-device` is not provided, asks you to select device index or name.
+3. Validates input settings (device, channels, sample rate).
+4. Records audio in chunks (default: 10 seconds, 16kHz, mono).
+5. Prints chunk level diagnostics (`rms` and `peak`) to help detect silent input.
+6. If `--save` is set, saves chunks to `recorded_chunks/chunk_000001.wav`, `chunk_000002.wav`, etc.
+7. Sends each chunk as multipart form-data (`file`) to the endpoint.
+8. Prints HTTP status and JSON/text response to console.
+9. Repeats until stopped with `Ctrl+C`.
+
+### Useful options
+- `--url`: API endpoint (default: `http://localhost:54322/transcribe`)
+- `--chunk-seconds`: chunk size in seconds (default: `10`)
+- `--sample-rate`: input sample rate in Hz (default: `16000`)
+- `--channels`: number of channels (default: `0`)
+- `--timeout`: HTTP timeout in seconds (default: `60`)
+- `--save`: save each recorded chunk as `.wav`
+- `--output-dir`: folder for saved WAV chunks (default: `recorded_chunks`)
+- `--input-device`: input device index or name
+- `--list-devices`: list devices and exit
+
+### Examples
+```shell
+# Interactive device selection
+python ./client/talk.transkribe.py --chunk-seconds 10
+
+# Use specific input device index
+python ./client/talk.transkribe.py --chunk-seconds 10 --input-device 2
+
+# Save chunks to a custom folder
+python ./client/talk.transkribe.py --save --output-dir ./my_chunks
+```
+
