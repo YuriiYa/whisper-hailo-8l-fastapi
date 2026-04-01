@@ -36,6 +36,7 @@ class HailoWhisperPipeline:
         self.decoder_model_path = decoder_model_path
         self.timeout_ms = 100000000
         self.variant = variant
+        self.preferred_languages = ["uk", "ru", "en"]
 
         self.decoding_sequence_length = 32 if self.variant == "tiny" else 24
         self.host = host  # not used in this version
@@ -47,12 +48,58 @@ class HailoWhisperPipeline:
 
         self.constant_output_0 = np.array([1])  # Unsqueeze axis
         self._load_tokenizer()
+        self.preferred_language_token_ids = self._resolve_preferred_language_tokens()
 
         self.data_queue = Queue()
         self.results_queue = Queue()
         self.running = True
         self.thread = Thread(target=self._inference_loop)
         self.thread.start()
+
+    def _resolve_preferred_language_tokens(self):
+        """
+        Resolve preferred language tokens in priority order.
+        """
+        token_ids = []
+        for lang in self.preferred_languages:
+            token = f"<|{lang}|>"
+            token_id = self.tokenizer.convert_tokens_to_ids(token)
+            if token_id is None or token_id == self.tokenizer.unk_token_id:
+                system_logger.warning("Preferred language token not found in tokenizer: %s", token)
+                continue
+            token_ids.append(token_id)
+
+        if token_ids:
+            system_logger.info(
+                "Language preference enabled. Priority order: %s",
+                ", ".join(self.preferred_languages),
+            )
+        else:
+            system_logger.warning("No preferred language tokens resolved. Language hinting disabled.")
+
+        return token_ids
+
+    def _apply_language_preference_hint(self, logits, step_index):
+        """
+        Soft-bias the first decoded token toward preferred language IDs.
+        """
+        if step_index != 0 or not self.preferred_language_token_ids:
+            return logits
+
+        adjusted = np.array(logits, copy=True)
+        if adjusted.ndim > 1:
+            adjusted = np.squeeze(adjusted)
+
+        if adjusted.ndim != 1:
+            return logits
+
+        boosts = [4.0, 2.0, 1.0]
+        for idx, token_id in enumerate(self.preferred_language_token_ids):
+            if 0 <= token_id < adjusted.shape[0]:
+                boost = boosts[idx] if idx < len(boosts) else 0.5
+                adjusted[token_id] += boost
+
+        return adjusted
 
     def _load_token_embedding_weight(self):
         """
@@ -190,6 +237,7 @@ class HailoWhisperPipeline:
                                 repetition_penalty = 1.5
                                 logits = apply_repetition_penalty(decoder_outputs[:, i], generated_tokens,
                                                                   penalty=repetition_penalty)
+                                logits = self._apply_language_preference_hint(logits, i)
                                 next_token = np.argmax(logits)
                                 # else:
                                 #   next_token = np.argmax(decoder_outputs[0][:, i])
