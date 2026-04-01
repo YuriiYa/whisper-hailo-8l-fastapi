@@ -17,7 +17,9 @@ class TranscribeAudioUseCase:
     ):
         self.audio_utils = audio_utils
         self.is_nhwc = True
-        self.variant = "tiny"
+        self.variant = (os.getenv("WHISPER_VARIANT") or "base").strip().lower()
+        if self.variant not in {"tiny", "base"}:
+            self.variant = "base"
         self.chunk_length = 10 if self.variant == "tiny" else 5
         # self.whisper_hailo = whisper_hailo
 

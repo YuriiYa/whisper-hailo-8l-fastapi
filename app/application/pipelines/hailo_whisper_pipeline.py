@@ -23,14 +23,14 @@ class HailoWhisperPipeline:
     A pipeline for running inference using Hailo's Whisper models.
     """
 
-    def __init__(self, encoder_model_path: str, decoder_model_path: str, variant="tiny", host="arm64",
+    def __init__(self, encoder_model_path: str, decoder_model_path: str, variant="base", host="arm64",
                  multi_process_service=False):
         """
         Initialize the pipeline.
 
         :param encoder_model_path: Path to the encoder model file.
         :param decoder_model_path: Path to the decoder model file.
-        :param variant: Model variant (e.g., "tiny").
+        :param variant: Model variant (e.g., "base").
         """
         self.encoder_model_path = encoder_model_path
         self.decoder_model_path = decoder_model_path
