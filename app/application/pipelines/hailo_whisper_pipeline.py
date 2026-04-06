@@ -36,7 +36,7 @@ class HailoWhisperPipeline:
         self.decoder_model_path = decoder_model_path
         self.timeout_ms = 100000000
         self.variant = variant
-        self.preferred_languages = ["uk", "ru", "en"]
+        self.preferred_languages = ["ua","ru","en"]
 
         self.decoding_sequence_length = 32 if self.variant == "tiny" else 24
         self.host = host  # not used in this version

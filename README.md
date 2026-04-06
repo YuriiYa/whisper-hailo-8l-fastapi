@@ -171,3 +171,43 @@ python ./client/talk.transkribe.py --chunk-seconds 10 --input-device 2
 python ./client/talk.transkribe.py --save --output-dir ./my_chunks
 ```
 
+
+## How to download additional models
+
+Described info [here](https://github.com/hailo-ai/Hailo-Application-Code-Examples/blob/main/runtime/python/speech_recognition/app/download_resources.py)
+
+
+```python
+BASE_HEF = "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/whisper"
+BASE_ASSETS = "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/npy%20files/whisper/decoder_assets"
+
+FILES = {
+    "hefs": {
+        "hailo8": {
+            "tiny": [
+                f"{BASE_HEF}/h8/tiny-whisper-decoder-fixed-sequence-matmul-split.hef",
+                f"{BASE_HEF}/h8/tiny-whisper-encoder-10s_15dB.hef",
+            ],
+            "base": [
+                f"{BASE_HEF}/h8/base-whisper-decoder-fixed-sequence-matmul-split.hef",
+                f"{BASE_HEF}/h8/base-whisper-encoder-5s.hef",
+            ],
+        }
+    },
+    "assets": {
+        "tiny": [
+            f"{BASE_ASSETS}/tiny/decoder_tokenization/onnx_add_input_tiny.npy",
+            f"{BASE_ASSETS}/tiny/decoder_tokenization/token_embedding_weight_tiny.npy",
+        ],
+        "base": [
+            f"{BASE_ASSETS}/base/decoder_tokenization/onnx_add_input_base.npy",
+            f"{BASE_ASSETS}/base/decoder_tokenization/token_embedding_weight_base.npy",
+        ],
+        "tiny.en": [
+            f"{BASE_ASSETS}/tiny.en/decoder_tokenization/onnx_add_input_tiny.en.npy",
+            f"{BASE_ASSETS}/tiny.en/decoder_tokenization/token_embedding_weight_tiny.en.npy",
+        ]
+    },
+}
+
+```
