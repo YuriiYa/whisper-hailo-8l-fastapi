@@ -36,7 +36,7 @@ class HailoWhisperPipeline:
         self.decoder_model_path = decoder_model_path
         self.timeout_ms = 100000000
         self.variant = variant
-        self.preferred_languages = ["ua","ru","en"]
+        self.preferred_languages = ["uk", "ru", "en"]
 
         self.decoding_sequence_length = 32 if self.variant == "tiny" else 24
         self.host = host  # not used in this version
@@ -49,6 +49,8 @@ class HailoWhisperPipeline:
         self.constant_output_0 = np.array([1])  # Unsqueeze axis
         self._load_tokenizer()
         self.preferred_language_token_ids = self._resolve_preferred_language_tokens()
+        self.transcribe_token_id = self.tokenizer.convert_tokens_to_ids("<|transcribe|>")
+        self.translate_token_id = self.tokenizer.convert_tokens_to_ids("<|translate|>")
 
         self.data_queue = Queue()
         self.results_queue = Queue()
@@ -98,6 +100,26 @@ class HailoWhisperPipeline:
             if 0 <= token_id < adjusted.shape[0]:
                 boost = boosts[idx] if idx < len(boosts) else 0.5
                 adjusted[token_id] += boost
+
+        return adjusted
+
+    def _apply_transcribe_only_hint(self, logits, step_index):
+        """
+        Prevent translation behavior and bias toward transcription task token.
+        """
+        adjusted = np.array(logits, copy=True)
+        if adjusted.ndim > 1:
+            adjusted = np.squeeze(adjusted)
+
+        if adjusted.ndim != 1:
+            return logits
+
+        if self.translate_token_id is not None and 0 <= self.translate_token_id < adjusted.shape[0]:
+            adjusted[self.translate_token_id] = -1e9
+
+        if step_index == 0 and self.transcribe_token_id is not None:
+            if 0 <= self.transcribe_token_id < adjusted.shape[0]:
+                adjusted[self.transcribe_token_id] += 6.0
 
         return adjusted
 
@@ -238,6 +260,7 @@ class HailoWhisperPipeline:
                                 logits = apply_repetition_penalty(decoder_outputs[:, i], generated_tokens,
                                                                   penalty=repetition_penalty)
                                 logits = self._apply_language_preference_hint(logits, i)
+                                logits = self._apply_transcribe_only_hint(logits, i)
                                 next_token = np.argmax(logits)
                                 # else:
                                 #   next_token = np.argmax(decoder_outputs[0][:, i])

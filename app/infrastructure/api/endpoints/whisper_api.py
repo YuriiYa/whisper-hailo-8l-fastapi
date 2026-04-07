@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Response, FastAPI, Request, BackgroundTasks, UploadFile, File
 from fastapi.params import Depends
 from tempfile import NamedTemporaryFile
-from infrastructure.config.whisper_hailo import get_whisper_hailo
+from infrastructure.config.whisper_hailo import get_whisper_hailo, get_whisper_hailo_lock
 
 from icecream import ic
 
@@ -32,13 +32,13 @@ async def transcribe_audio(
             tmp_path = tmp.name
         whisper_hailo = get_whisper_hailo()
         try:
-            result = await whisper_service.transcribe_audio(whisper_hailo, audio_file_path=tmp_path)
+            async with get_whisper_hailo_lock():
+                result = await whisper_service.transcribe_audio(whisper_hailo, audio_file_path=tmp_path)
         except Exception as e:
             system_logger.error(f"Error during transcription: {e}")
             response.status_code = 500
             return {"error": "An error occurred during transcription."}
         finally:
-            whisper_hailo.stop()
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 

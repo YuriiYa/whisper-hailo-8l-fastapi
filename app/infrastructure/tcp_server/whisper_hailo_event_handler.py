@@ -14,7 +14,7 @@ from wyoming.info import Describe, Info
 from wyoming.server import AsyncEventHandler
 
 from infrastructure.config.services_config import get_whisper_service
-from infrastructure.config.whisper_hailo import get_whisper_hailo
+from infrastructure.config.whisper_hailo import get_whisper_hailo, get_whisper_hailo_lock
 
 system_logger = logging.getLogger(__name__)
 
@@ -60,12 +60,11 @@ class WhisperHailoEventHandler(AsyncEventHandler):
             whisper_hailo = get_whisper_hailo()
 
             try:
-                result = await self.whisper_service.transcribe_audio(whisper_hailo, audio_file_path=self._wav_path)
+                async with get_whisper_hailo_lock():
+                    result = await self.whisper_service.transcribe_audio(whisper_hailo, audio_file_path=self._wav_path)
             except Exception as e:
                 system_logger.error(f"Error during transcription: {e}")
                 return False
-            finally:
-                whisper_hailo.stop()
 
             await self.write_event(Transcript(text=result).event())
             system_logger.info(f"Successful transcription: {result}")

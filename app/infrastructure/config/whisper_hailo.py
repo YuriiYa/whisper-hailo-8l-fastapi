@@ -1,5 +1,6 @@
 import logging
 import os
+import asyncio
 from fastapi import FastAPI
 from application.pipelines.hailo_whisper_pipeline import HailoWhisperPipeline
 from infrastructure.config.utils_config import hef_utils, args_utils
@@ -22,6 +23,9 @@ hailo_model = ""
 whisper_variant = "base"
 encoder_path = ""
 decoder_path = ""
+multi_process_service = False
+whisper_hailo_instance: HailoWhisperPipeline | None = None
+whisper_hailo_lock = asyncio.Lock()
 
 
 def _get_whisper_variant_from_env() -> str:
@@ -34,6 +38,11 @@ def _get_whisper_variant_from_env() -> str:
         )
         return "base"
     return variant
+
+
+def _get_multi_process_service_from_env() -> bool:
+    raw = (os.getenv("WHISPER_MULTI_PROCESS_SERVICE") or "FALSE").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def config(app: FastAPI, _model: str = "hailo8l") -> None:
@@ -51,6 +60,21 @@ def config(app: FastAPI, _model: str = "hailo8l") -> None:
     global decoder_path
     decoder_path = hef_utils.get_decoder_hef_path(_model, whisper_variant)
 
+    global multi_process_service
+    multi_process_service = _get_multi_process_service_from_env()
+    system_logger.info("Configuring multi_process_service: %s", multi_process_service)
+
+    global whisper_hailo_instance
+    if whisper_hailo_instance is not None:
+        whisper_hailo_instance.stop()
+
+    whisper_hailo_instance = HailoWhisperPipeline(
+        encoder_model_path=encoder_path,
+        decoder_model_path=decoder_path,
+        variant=whisper_variant,
+        multi_process_service=multi_process_service,
+    )
+
 
     # encoder_path = hef_utils.get_encoder_hef_path(model)
     # decoder_path = hef_utils.get_decoder_hef_path(model)
@@ -64,13 +88,23 @@ def config(app: FastAPI, _model: str = "hailo8l") -> None:
 
 
 def whisper_hailo_stop():
-    whisper_hailo.stop()
+    global whisper_hailo_instance
+    if whisper_hailo_instance is not None:
+        whisper_hailo_instance.stop()
+        whisper_hailo_instance = None
+
+
+def get_whisper_hailo_lock() -> asyncio.Lock:
+    return whisper_hailo_lock
 
 def get_whisper_hailo() -> HailoWhisperPipeline:
-    whisper_hailo = HailoWhisperPipeline(
-        encoder_model_path=encoder_path,
-        decoder_model_path=decoder_path,
-        variant=whisper_variant,
-        multi_process_service=False)
+    global whisper_hailo_instance
+    if whisper_hailo_instance is None:
+        whisper_hailo_instance = HailoWhisperPipeline(
+            encoder_model_path=encoder_path,
+            decoder_model_path=decoder_path,
+            variant=whisper_variant,
+            multi_process_service=multi_process_service,
+        )
 
-    return whisper_hailo
+    return whisper_hailo_instance

@@ -65,7 +65,7 @@ Using docker-compose instead of Docker will make it much easier to launch the se
 
 2. Run service
     ```shell
-    docker-compose up --build
+    docker compose up --build
     ```
 
 #### Local
@@ -73,7 +73,14 @@ Using docker-compose instead of Docker will make it much easier to launch the se
     ```
     IS_HAILO_ON_DEVICE="TRUE" # if you want to run service NOT it RP5, you need to change this value on "FALSE"
     HAILO_VERSION="HAILO8L" # This value can be only "HAILO8L" or "HAILO8"
+    WHISPER_MULTI_PROCESS_SERVICE="FALSE" # optional: set TRUE to enable Hailo shared multi-process service mode
     ```
+
+   Notes:
+   - The service uses one shared long-lived Whisper pipeline instance.
+   - Access to that pipeline is protected by a lock, so transcription jobs are processed one-by-one to avoid mixed outputs.
+   - If multiple clients call `/transcribe` at the same time, requests are queued and may wait for previous jobs to finish.
+   - `WHISPER_MULTI_PROCESS_SERVICE` enables Hailo shared service mode in the pipeline configuration, but API-level access remains serialized for correctness.
 
 2. In file app/application/pipelines/hailo_whisper_pipeline you need to comment out `line 11`
     ```
@@ -158,9 +165,15 @@ python ./client/talk.transkribe.py --chunk-seconds 10
 - `--output-dir`: folder for saved WAV chunks (default: `recorded_chunks`)
 - `--input-device`: input device index or name
 - `--list-devices`: list devices and exit
+- `--step-ms`: how far the window moves each time in ms. Step 9000 ms means:0-10, 9-19, 18-28, ...
+- `--overlap-seconds`: Minimum overlap 
+- `--workers`: is how many parallel transcription threads the client uses to send chunks to your API.
 
 ### Examples
+
 ```shell
+python ./client/talk.transkribe.py --chunk-seconds 10 --step-ms 9000 --overlap-seconds 1.0 --workers 1 --save
+
 # Interactive device selection
 python ./client/talk.transkribe.py --chunk-seconds 10
 
