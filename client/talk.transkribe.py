@@ -108,7 +108,7 @@ def transcribe_worker(
             )
             try:
                 payload = response.json()
-                print(json.dumps(payload, indent=2, ensure_ascii=True))
+                print(json.dumps(payload, indent=2, ensure_ascii=False))
             except ValueError:
                 print(response.text)
         except requests.RequestException as exc:
