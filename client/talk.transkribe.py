@@ -88,10 +88,11 @@ def transcribe_worker(
             continue
 
         try:
-            rms, peak = compute_levels(audio)
+            rms, peak =  compute_levels(audio)
             print(f"[chunk {chunk_index}] level: rms={rms:.6f}, peak={peak:.6f}")
             if peak < 0.005:
                 print("[warn] very low input level detected; check mic device/gain/mute")
+                continue
 
             wav_bytes = to_wav_bytes(audio, args.sample_rate, args.channels)
             if args.save:
@@ -123,7 +124,7 @@ def transcribe_worker(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Listen to mic and send 10-second WAV chunks to transcribe endpoint"
+        description="Listen to mic and send n-second WAV chunks to transcribe endpoint"
     )
     parser.add_argument("--url", default=DEFAULT_URL, help="Transcribe endpoint URL")
     parser.add_argument(
