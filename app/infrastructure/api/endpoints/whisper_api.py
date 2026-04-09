@@ -1,12 +1,9 @@
 import os
 import logging
-from fastapi import APIRouter, Response, FastAPI, Request, BackgroundTasks, UploadFile, File
-from fastapi.params import Depends
+from fastapi import APIRouter, Response, FastAPI, UploadFile, File, Depends
 from tempfile import NamedTemporaryFile
 from infrastructure.config.whisper_hailo import get_whisper_hailo, get_whisper_hailo_lock
 from infrastructure.config.runtime_env import RuntimeEnvConfig
-
-from icecream import ic
 
 from application.services.whisper_service import WhisperService
 from infrastructure.config.services_config import get_whisper_service
@@ -14,16 +11,18 @@ from infrastructure.config.services_config import get_whisper_service
 router = APIRouter()
 
 system_logger = logging.getLogger(__name__)
+
+
 def config(app: FastAPI):
     app.include_router(router)
 
 
 @router.post("/transcribe")
 async def transcribe_audio(
-        response: Response, background_tasks: BackgroundTasks,
-        request: Request,
-        file: UploadFile = File(...),
-        whisper_service: WhisperService = Depends(get_whisper_service)):
+    response: Response,
+    file: UploadFile = File(...),
+    whisper_service: WhisperService = Depends(get_whisper_service),
+):
 
     runtime_env = RuntimeEnvConfig.from_env()
 
