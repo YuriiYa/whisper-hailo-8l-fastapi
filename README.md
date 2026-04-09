@@ -8,7 +8,7 @@ It was created and tested on:
 - Hailo8L
 
 ### Requirements
-- Hailo8 / Hailo8L
+- Hailo8 / Hailo8L / VOSK 
 - HailoRT 4.20
 - HailoRT PCIe driver
 - PyHailoRT (.whl file; Can be downloaded https://hailo.ai/developer-zone/software-downloads; You need file HailoRT – Python package (whl) for Python 3.11, aarch64)
@@ -224,3 +224,8 @@ FILES = {
 }
 
 ```
+
+VOSK model can be found on [official site](https://alphacephei.com/vosk/models)
+- on pi5 vosk model perform better (quality and speed) then hailo models. Checke with:
+ - vosk-model-uk-v3
+ - vosk-model-uk-v3-lgraph

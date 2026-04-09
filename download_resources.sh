@@ -63,4 +63,23 @@ wget -P app/infrastructure/decoder_assets/base/decoder_tokenization "https://hai
 echo "Download complete."
 
 
+# ---------------------------------------------------------------------------
+# VOSK model (used when HAILO_VERSION=VOSK)
+# ---------------------------------------------------------------------------
+VOSK_MODEL_NAME="vosk-model-uk-v3-lgraph"
+VOSK_MODEL_ZIP="${VOSK_MODEL_NAME}.zip"
+VOSK_MODEL_URL="https://alphacephei.com/vosk/models/${VOSK_MODEL_ZIP}"
+
+if [ -d "${VOSK_MODEL_NAME}" ]; then
+  echo "VOSK model '${VOSK_MODEL_NAME}' already exists, skipping download."
+else
+  echo "Downloading VOSK model ${VOSK_MODEL_NAME}..."
+  wget -q --show-progress "${VOSK_MODEL_URL}"
+  echo "Extracting ${VOSK_MODEL_ZIP}..."
+  unzip -q "${VOSK_MODEL_ZIP}"
+  rm "${VOSK_MODEL_ZIP}"
+  echo "VOSK model ready at: ${VOSK_MODEL_NAME}"
+fi
+
+
 

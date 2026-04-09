@@ -2,7 +2,6 @@ import os
 import time
 import logging
 import numpy as np
-from application.pipelines.hailo_whisper_pipeline import HailoWhisperPipeline
 from application.utils.audio_utils import AudioUtils
 from infrastructure.common_functions.postprocessing import clean_transcription
 from infrastructure.common_functions.preprocessing import improve_input_audio, preprocess
@@ -25,6 +24,11 @@ class TranscribeAudioUseCase:
 
 
     async def execute(self, whisper_hailo, audio_path: str) -> str:
+        hailo_version = (os.getenv("HAILO_VERSION") or "").strip().upper()
+
+        if hailo_version == "VOSK":
+            return whisper_hailo.transcribe_file(audio_path)
+
         print(f"IS_HAILO_ON_DEVICE: {os.getenv('IS_HAILO_ON_DEVICE')}")
         if os.getenv("IS_HAILO_ON_DEVICE") == 'TRUE':
             sampled_audio = self.audio_utils.load_audio(audio_path)
