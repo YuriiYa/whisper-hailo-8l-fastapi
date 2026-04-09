@@ -57,6 +57,8 @@ https://hailo.ai/developer-zone/documentation/hailort-v4-20-0/?sp_referrer=insta
    
     The PyHailoRT version must match the installed HailoRT version. NOTE: This step is not necessary for Raspberry Pi 5 users who installed the hailo-all package, since the venv will inherit the system package.
 
+
+
 ### Run
 #### Docker-compose
 Using docker-compose instead of Docker will make it much easier to launch the service.
@@ -113,21 +115,25 @@ You can change port by changing it in `docker-compose.yaml` or `Makefile` in loc
 
 ### Minimal TTS (Ukrainian)
 
-The service now includes a minimal local TTS endpoint powered by `espeak-ng`.
+The service includes a local TTS endpoint with support for multiple engines.
 
-Install on Ubuntu/Raspberry Pi OS:
-```shell
-sudo apt update && sudo apt install -y espeak-ng
-```
+#### Supported TTS Engines
 
-Optional environment variables:
+**espeak-ng** (lightweight, default):
+- Lightweight, fast
+- Lower quality synthesis
+- Install: `sudo apt update && sudo apt install -y espeak-ng`
+
+#### Environment Variables
+
 ```shell
 TTS_ENGINE_BINARY="espeak-ng"
-TTS_DEFAULT_VOICE="uk"
-TTS_DEFAULT_SPEED="170"
+TTS_DEFAULT_VOICE="uk"             # Ukrainian
+TTS_DEFAULT_SPEED="170"            # 0-450
 ```
 
-Request example:
+#### Request example
+
 ```shell
 curl -X POST "http://localhost:54322/tts" \
     -H "Content-Type: application/json" \
@@ -269,3 +275,20 @@ VOSK model can be found on [official site](https://alphacephei.com/vosk/models)
  - vosk-model-uk-v3
  - vosk-model-uk-v3-lgraph
  
+## Errors
+
+> pyproject.toml changed significantly since poetry.lock was last generated. Run `poetry lock` to fix the lock file. 
+Is fixed by running 
+
+`python3 -m poetry lock`
+
+## Future
+
+
+Impmenet `ukrainian-tts (robinhad)`
+Pure Python, ESPNET-based, MIT license
+Multiple voices (Oleksa, Dmytro, etc.) with automatic stress placement
+Explicitly supports Linux ARM in README
+Install: pip install git+https://github.com/robinhad/ukrainian-tts.git
+Heavier than Piper (loads ESPNET models), but higher quality synthesis
+237 stars, active Ukrainian community
