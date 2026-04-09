@@ -1,0 +1,10 @@
+curl -s -X POST "http://localhost:54322/tts" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Привіт! Це перевірка озвучення.","voice":"uk","speed":100}' \
+  | aplay -q
+
+###
+  curl -s -X POST "http://localhost:54322/tts" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Привіт! Це перевірка озвучення.","voice":"uk","speed":170}' \
+  -o tts.wav && aplay tts.wav

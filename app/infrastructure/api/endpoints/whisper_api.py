@@ -1,16 +1,24 @@
 import os
 import logging
 from fastapi import APIRouter, Response, FastAPI, UploadFile, File, Depends
+from pydantic import BaseModel, Field
 from tempfile import NamedTemporaryFile
 from infrastructure.config.whisper_hailo import get_whisper_hailo, get_whisper_hailo_lock
 from infrastructure.config.runtime_env import RuntimeEnvConfig
 
+from application.services.tts_service import TTSService
 from application.services.whisper_service import WhisperService
-from infrastructure.config.services_config import get_whisper_service
+from infrastructure.config.services_config import get_whisper_service, get_tts_service
 
 router = APIRouter()
 
 system_logger = logging.getLogger(__name__)
+
+
+class TTSRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+    voice: str | None = None
+    speed: int | None = Field(default=None, ge=80, le=450)
 
 
 def config(app: FastAPI):
@@ -47,5 +55,31 @@ async def transcribe_audio(
         return {"message": result}
     else:
         return {"message": "Server in debug mode"}
+
+
+@router.post("/tts")
+async def text_to_speech(
+    payload: TTSRequest,
+    tts_service: TTSService = Depends(get_tts_service),
+):
+    try:
+        wav_bytes = tts_service.synthesize(
+            text=payload.text,
+            voice=payload.voice,
+            speed=payload.speed,
+        )
+    except RuntimeError as e:
+        system_logger.error("Error during TTS synthesis: %s", e)
+        return Response(
+            content=str(e),
+            status_code=503,
+            media_type="text/plain",
+        )
+
+    return Response(
+        content=wav_bytes,
+        media_type="audio/wav",
+        headers={"Content-Disposition": "inline; filename=tts.wav"},
+    )
 
 

@@ -63,7 +63,14 @@ Using docker-compose instead of Docker will make it much easier to launch the se
 
 1. If you have "Hailo-8" you need to open docker-compose.yaml and change ENV value `HAILO_VERSION`
 
-2. Run service
+2. TTS is enabled in compose with defaults:
+    ```
+    TTS_ENGINE_BINARY="espeak-ng"
+    TTS_DEFAULT_VOICE="uk"
+    TTS_DEFAULT_SPEED="170"
+    ```
+
+3. Run service
     ```shell
     docker compose up --build
     ```
@@ -100,7 +107,33 @@ Wyoming protocol is using TCP connection with port `10300`
 #### API
 For standard requests of your services you can use port `54322` with route `/transcribe`
 
+For text-to-speech, use route `/tts` (returns `audio/wav`).
+
 You can change port by changing it in `docker-compose.yaml` or `Makefile` in local
+
+### Minimal TTS (Ukrainian)
+
+The service now includes a minimal local TTS endpoint powered by `espeak-ng`.
+
+Install on Ubuntu/Raspberry Pi OS:
+```shell
+sudo apt update && sudo apt install -y espeak-ng
+```
+
+Optional environment variables:
+```shell
+TTS_ENGINE_BINARY="espeak-ng"
+TTS_DEFAULT_VOICE="uk"
+TTS_DEFAULT_SPEED="170"
+```
+
+Request example:
+```shell
+curl -X POST "http://localhost:54322/tts" \
+    -H "Content-Type: application/json" \
+    -d '{"text":"Привіт! Це тест українського синтезу.","voice":"uk","speed":170}' \
+    --output tts.wav
+```
 
 
 

@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     libxmlsec1-dev \
     libbz2-dev \
     ffmpeg \
+    espeak-ng \
     libportaudio2 \
     wget \
     make \
@@ -61,6 +62,6 @@ RUN poetry run pip install requirements_files/hailort-4.20.0-cp311-cp311-linux_a
 
 RUN ./download_resources.sh
 
-WORKDIR ./app
+WORKDIR /home/usr/whisper-hailo-8l-fastapi/app
 
 CMD ["make", "run"]

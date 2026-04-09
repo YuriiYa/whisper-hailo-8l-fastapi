@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   whisper-hailo:
     image: whisper-hailo-image:latest
@@ -12,6 +10,9 @@ services:
       HAILO_VERSION: "VOSK"         # HAILO8, HAILO8L, or VOSK
       WHISPER_VARIANT: "base"         # base (default) or tiny
       VOSK_MODEL_PATH: "requirements_files/vosk-model-uk-v3-lgraph"   # path to VOSK model dir; used only when HAILO_VERSION=VOSK
+      TTS_ENGINE_BINARY: "espeak-ng"
+      TTS_DEFAULT_VOICE: "uk"
+      TTS_DEFAULT_SPEED: "170"
     ports:
       - "10300:10300"                  # TCP  port for Wyoming Protocol
       - "54322:54322"                  # HTTP port for FastAPI
