@@ -71,7 +71,7 @@ Using docker-compose instead of Docker will make it much easier to launch the se
 #### Local
 1. Change .env file
     ```
-    IS_HAILO_ON_DEVICE="TRUE" # if you want to run service NOT it RP5, you need to change this value on "FALSE"
+    IS_HAILO_ON_DEVICE="TRUE" # if you want to run service on RP5 but on hailo chip, you need to change this value on "FALSE"
     HAILO_VERSION="HAILO8L" # This value can be only "HAILO8L" or "HAILO8"
     WHISPER_MULTI_PROCESS_SERVICE="FALSE" # optional: set TRUE to enable Hailo shared multi-process service mode
     ```

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Response, FastAPI, Request, BackgroundTasks, Uplo
 from fastapi.params import Depends
 from tempfile import NamedTemporaryFile
 from infrastructure.config.whisper_hailo import get_whisper_hailo, get_whisper_hailo_lock
+from infrastructure.config.runtime_env import RuntimeEnvConfig
 
 from icecream import ic
 
@@ -24,7 +25,9 @@ async def transcribe_audio(
         file: UploadFile = File(...),
         whisper_service: WhisperService = Depends(get_whisper_service)):
 
-    if os.getenv("IS_HAILO_ON_DEVICE") == "TRUE":
+    runtime_env = RuntimeEnvConfig.from_env()
+
+    if runtime_env.can_transcribe:
         suffix = os.path.splitext(file.filename)[1]
         with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             content = await file.read()

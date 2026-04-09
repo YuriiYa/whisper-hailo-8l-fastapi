@@ -8,7 +8,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      IS_HAILO_ON_DEVICE: "TRUE"
+      IS_HAILO_ON_DEVICE: "FALSE"
       HAILO_VERSION: "VOSK"         # HAILO8, HAILO8L, or VOSK
       WHISPER_VARIANT: "base"         # base (default) or tiny
       VOSK_MODEL_PATH: "requirements_files/vosk-model-uk-v3-lgraph"   # path to VOSK model dir; used only when HAILO_VERSION=VOSK

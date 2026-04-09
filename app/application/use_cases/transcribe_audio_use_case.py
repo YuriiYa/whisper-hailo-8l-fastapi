@@ -3,6 +3,7 @@ import time
 import logging
 import numpy as np
 from application.utils.audio_utils import AudioUtils
+from infrastructure.config.runtime_env import RuntimeEnvConfig
 from infrastructure.common_functions.postprocessing import clean_transcription
 from infrastructure.common_functions.preprocessing import improve_input_audio, preprocess
 
@@ -24,13 +25,13 @@ class TranscribeAudioUseCase:
 
 
     async def execute(self, whisper_hailo, audio_path: str) -> str:
-        hailo_version = (os.getenv("HAILO_VERSION") or "").strip().upper()
+        runtime_env = RuntimeEnvConfig.from_env()
 
-        if hailo_version == "VOSK":
+        if runtime_env.is_vosk_mode:
             return whisper_hailo.transcribe_file(audio_path)
 
-        print(f"IS_HAILO_ON_DEVICE: {os.getenv('IS_HAILO_ON_DEVICE')}")
-        if os.getenv("IS_HAILO_ON_DEVICE") == 'TRUE':
+        print(f"IS_HAILO_ON_DEVICE: {runtime_env.is_hailo_on_device}")
+        if runtime_env.is_hailo_on_device:
             sampled_audio = self.audio_utils.load_audio(audio_path)
 
             sampled_audio, start_time = improve_input_audio(sampled_audio, vad=True)
