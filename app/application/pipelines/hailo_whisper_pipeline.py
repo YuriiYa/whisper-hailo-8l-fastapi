@@ -129,9 +129,9 @@ class HailoWhisperPipeline:
         Load token embedding weights.
         """
         # base_path = os.path.dirname(os.path.abspath(__file__), os.pardir, os.pardir)
-        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
         file_path = os.path.join(base_path,
-                                 f"infrastructure/decoder_assets/{self.variant}/decoder_tokenization/token_embedding_weight_{self.variant}.npy")
+                                 f"requirements_files/decoder_assets/{self.variant}/decoder_tokenization/token_embedding_weight_{self.variant}.npy")
         
         print(f"decoder_tokenization/token_embedding_weight_path: {file_path}")
         return np.load(file_path)
@@ -141,9 +141,9 @@ class HailoWhisperPipeline:
         """
         Load ONNX add input.
         """
-        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
         file_path = os.path.join(base_path,
-                                 f"infrastructure/decoder_assets/{self.variant}/decoder_tokenization/onnx_add_input_{self.variant}.npy")
+                                 f"requirements_files/decoder_assets/{self.variant}/decoder_tokenization/onnx_add_input_{self.variant}.npy")
         print(f"decoder_tokenization/onnx_add_input_path: {file_path}")
 
         return np.load(file_path)

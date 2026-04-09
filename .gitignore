@@ -193,7 +193,8 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-app/infrastructure/hefs/*
-app/infrastructure/decoder_assets/*
+requirements_files/hefs/*
+requirements_files/decoder_assets/*
+requirements_files/vosk-*/
 
 .env

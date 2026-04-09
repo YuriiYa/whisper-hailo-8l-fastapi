@@ -9,9 +9,9 @@ services:
       dockerfile: Dockerfile
     environment:
       IS_HAILO_ON_DEVICE: "TRUE"
-      HAILO_VERSION: "HAILO8"         # HAILO8, HAILO8L, or VOSK
+      HAILO_VERSION: "VOSK"         # HAILO8, HAILO8L, or VOSK
       WHISPER_VARIANT: "base"         # base (default) or tiny
-      VOSK_MODEL_PATH: "vosk-model-uk-v3-lgraph"   # path to VOSK model dir; used only when HAILO_VERSION=VOSK
+      VOSK_MODEL_PATH: "requirements_files/vosk-model-uk-v3-lgraph"   # path to VOSK model dir; used only when HAILO_VERSION=VOSK
     ports:
       - "10300:10300"                  # TCP  port for Wyoming Protocol
       - "54322:54322"                  # HTTP port for FastAPI

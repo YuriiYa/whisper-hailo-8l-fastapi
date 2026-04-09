@@ -1,63 +1,106 @@
 #!/bin/bash
 
-# Check if the HEFs directory exists and delete it if it does
-if [ -d "app/infrastructure/hefs" ]; then
-  echo "Deleting existing 'app/infrastructure/hefs' directory..."
-  rm -rf app/infrastructure/hefs
+REQ="requirements_files"
+
+# ---------------------------------------------------------------------------
+# HEF files
+# ---------------------------------------------------------------------------
+
+mkdir -p "${REQ}/hefs/h8/tiny"
+
+HEF_H8_TINY_DECODER="${REQ}/hefs/h8/tiny/tiny-whisper-decoder-fixed-sequence-matmul-split.hef"
+if [ -f "${HEF_H8_TINY_DECODER}" ]; then
+  echo "Already exists, skipping: ${HEF_H8_TINY_DECODER}"
+else
+  echo "Downloading tiny-whisper-decoder for Hailo-8..."
+  wget -P "${REQ}/hefs/h8/tiny" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/hefs/h8/tiny-whisper-decoder-fixed-sequence-matmul-split.hef"
 fi
 
-# Create tiny HEF directories
-mkdir -p app/infrastructure/hefs/h8/tiny
-
-echo "Downloading tiny-whisper-decoder for Hailo-8..."
-wget -P app/infrastructure/hefs/h8/tiny "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/hefs/h8/tiny-whisper-decoder-fixed-sequence-matmul-split.hef"
-
-echo "Downloading tiny-whisper-encoder for Hailo-8..."
-wget -P app/infrastructure/hefs/h8/tiny "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/hefs/h8/tiny-whisper-encoder-10s_15dB.hef"
-
-
-# Create tiny HEF directories for Hailo-8L
-mkdir -p app/infrastructure/hefs/h8l/tiny
-
-echo "Downloading tiny-whisper-decoder for Hailo-8L..."
-wget -P app/infrastructure/hefs/h8l/tiny "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/hefs/h8l_rpi/tiny-whisper-decoder-fixed-sequence-matmul-split_h8l.hef"
-
-echo "Downloading tiny-whisper-encoder for Hailo-8L..."
-wget -P app/infrastructure/hefs/h8l/tiny "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/hefs/h8l_rpi/tiny-whisper-encoder-10s_15dB_h8l.hef"
-
-
-# Create base HEF directory for Hailo-8
-mkdir -p app/infrastructure/hefs/h8/base
-
-echo "Downloading base-whisper-decoder for Hailo-8..."
-wget -P app/infrastructure/hefs/h8/base "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/whisper/h8/base-whisper-decoder-fixed-sequence-matmul-split.hef"
-
-echo "Downloading base-whisper-encoder for Hailo-8..."
-wget -P app/infrastructure/hefs/h8/base "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/whisper/h8/base-whisper-encoder-5s.hef"
-
-
-if [ -d "app/infrastructure/decoder_assets" ]; then
-  echo "Deleting existing 'app/infrastructure/decoder_assets' directory..."
-  rm -rf app/infrastructure/decoder_assets
+HEF_H8_TINY_ENCODER="${REQ}/hefs/h8/tiny/tiny-whisper-encoder-10s_15dB.hef"
+if [ -f "${HEF_H8_TINY_ENCODER}" ]; then
+  echo "Already exists, skipping: ${HEF_H8_TINY_ENCODER}"
+else
+  echo "Downloading tiny-whisper-encoder for Hailo-8..."
+  wget -P "${REQ}/hefs/h8/tiny" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/hefs/h8/tiny-whisper-encoder-10s_15dB.hef"
 fi
 
 
-echo "Creating new 'decoder_assets/tiny' directory..."
-mkdir -p app/infrastructure/decoder_assets/tiny
-mkdir -p app/infrastructure/decoder_assets/tiny/decoder_tokenization
+mkdir -p "${REQ}/hefs/h8l/tiny"
 
-echo "Downloading decoder assets..."
-wget -P app/infrastructure/decoder_assets/tiny/decoder_tokenization "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/npy%20files/whisper/decoder_assets/tiny/decoder_tokenization/onnx_add_input_tiny.npy"
-wget -P app/infrastructure/decoder_assets/tiny/decoder_tokenization "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/npy%20files/whisper/decoder_assets/tiny/decoder_tokenization/token_embedding_weight_tiny.npy"
+HEF_H8L_TINY_DECODER="${REQ}/hefs/h8l/tiny/tiny-whisper-decoder-fixed-sequence-matmul-split_h8l.hef"
+if [ -f "${HEF_H8L_TINY_DECODER}" ]; then
+  echo "Already exists, skipping: ${HEF_H8L_TINY_DECODER}"
+else
+  echo "Downloading tiny-whisper-decoder for Hailo-8L..."
+  wget -P "${REQ}/hefs/h8l/tiny" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/hefs/h8l_rpi/tiny-whisper-decoder-fixed-sequence-matmul-split_h8l.hef"
+fi
+
+HEF_H8L_TINY_ENCODER="${REQ}/hefs/h8l/tiny/tiny-whisper-encoder-10s_15dB_h8l.hef"
+if [ -f "${HEF_H8L_TINY_ENCODER}" ]; then
+  echo "Already exists, skipping: ${HEF_H8L_TINY_ENCODER}"
+else
+  echo "Downloading tiny-whisper-encoder for Hailo-8L..."
+  wget -P "${REQ}/hefs/h8l/tiny" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/hefs/h8l_rpi/tiny-whisper-encoder-10s_15dB_h8l.hef"
+fi
 
 
-echo "Creating new 'decoder_assets/base' directory..."
-mkdir -p app/infrastructure/decoder_assets/base
-mkdir -p app/infrastructure/decoder_assets/base/decoder_tokenization
+mkdir -p "${REQ}/hefs/h8/base"
 
-echo "Downloading base decoder assets..."
-wget -P app/infrastructure/decoder_assets/base/decoder_tokenization "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/npy%20files/whisper/decoder_assets/base/decoder_tokenization/onnx_add_input_base.npy"
-wget -P app/infrastructure/decoder_assets/base/decoder_tokenization "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/npy%20files/whisper/decoder_assets/base/decoder_tokenization/token_embedding_weight_base.npy"
+HEF_H8_BASE_DECODER="${REQ}/hefs/h8/base/base-whisper-decoder-fixed-sequence-matmul-split.hef"
+if [ -f "${HEF_H8_BASE_DECODER}" ]; then
+  echo "Already exists, skipping: ${HEF_H8_BASE_DECODER}"
+else
+  echo "Downloading base-whisper-decoder for Hailo-8..."
+  wget -P "${REQ}/hefs/h8/base" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/whisper/h8/base-whisper-decoder-fixed-sequence-matmul-split.hef"
+fi
+
+HEF_H8_BASE_ENCODER="${REQ}/hefs/h8/base/base-whisper-encoder-5s.hef"
+if [ -f "${HEF_H8_BASE_ENCODER}" ]; then
+  echo "Already exists, skipping: ${HEF_H8_BASE_ENCODER}"
+else
+  echo "Downloading base-whisper-encoder for Hailo-8..."
+  wget -P "${REQ}/hefs/h8/base" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/whisper/h8/base-whisper-encoder-5s.hef"
+fi
+
+
+# ---------------------------------------------------------------------------
+# Decoder tokenization assets
+# ---------------------------------------------------------------------------
+
+mkdir -p "${REQ}/decoder_assets/tiny/decoder_tokenization"
+
+NPY_TINY_ADD="${REQ}/decoder_assets/tiny/decoder_tokenization/onnx_add_input_tiny.npy"
+if [ -f "${NPY_TINY_ADD}" ]; then
+  echo "Already exists, skipping: ${NPY_TINY_ADD}"
+else
+  echo "Downloading decoder assets (tiny)..."
+  wget -P "${REQ}/decoder_assets/tiny/decoder_tokenization" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/npy%20files/whisper/decoder_assets/tiny/decoder_tokenization/onnx_add_input_tiny.npy"
+fi
+
+NPY_TINY_EMB="${REQ}/decoder_assets/tiny/decoder_tokenization/token_embedding_weight_tiny.npy"
+if [ -f "${NPY_TINY_EMB}" ]; then
+  echo "Already exists, skipping: ${NPY_TINY_EMB}"
+else
+  wget -P "${REQ}/decoder_assets/tiny/decoder_tokenization" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/npy%20files/whisper/decoder_assets/tiny/decoder_tokenization/token_embedding_weight_tiny.npy"
+fi
+
+
+mkdir -p "${REQ}/decoder_assets/base/decoder_tokenization"
+
+NPY_BASE_ADD="${REQ}/decoder_assets/base/decoder_tokenization/onnx_add_input_base.npy"
+if [ -f "${NPY_BASE_ADD}" ]; then
+  echo "Already exists, skipping: ${NPY_BASE_ADD}"
+else
+  echo "Downloading decoder assets (base)..."
+  wget -P "${REQ}/decoder_assets/base/decoder_tokenization" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/npy%20files/whisper/decoder_assets/base/decoder_tokenization/onnx_add_input_base.npy"
+fi
+
+NPY_BASE_EMB="${REQ}/decoder_assets/base/decoder_tokenization/token_embedding_weight_base.npy"
+if [ -f "${NPY_BASE_EMB}" ]; then
+  echo "Already exists, skipping: ${NPY_BASE_EMB}"
+else
+  wget -P "${REQ}/decoder_assets/base/decoder_tokenization" "https://hailo-csdata.s3.eu-west-2.amazonaws.com/resources/npy%20files/whisper/decoder_assets/base/decoder_tokenization/token_embedding_weight_base.npy"
+fi
 
 
 echo "Download complete."
@@ -69,17 +112,17 @@ echo "Download complete."
 VOSK_MODEL_NAME="vosk-model-uk-v3-lgraph"
 VOSK_MODEL_ZIP="${VOSK_MODEL_NAME}.zip"
 VOSK_MODEL_URL="https://alphacephei.com/vosk/models/${VOSK_MODEL_ZIP}"
+VOSK_MODEL_DEST="${REQ}/${VOSK_MODEL_NAME}"
 
-if [ -d "${VOSK_MODEL_NAME}" ]; then
+if [ -d "${VOSK_MODEL_DEST}" ]; then
   echo "VOSK model '${VOSK_MODEL_NAME}' already exists, skipping download."
 else
   echo "Downloading VOSK model ${VOSK_MODEL_NAME}..."
-  wget -q --show-progress "${VOSK_MODEL_URL}"
+  wget -q --show-progress -P "${REQ}" "${VOSK_MODEL_URL}"
   echo "Extracting ${VOSK_MODEL_ZIP}..."
-  unzip -q "${VOSK_MODEL_ZIP}"
-  rm "${VOSK_MODEL_ZIP}"
-  echo "VOSK model ready at: ${VOSK_MODEL_NAME}"
+  unzip -q "${REQ}/${VOSK_MODEL_ZIP}" -d "${REQ}"
+  rm "${REQ}/${VOSK_MODEL_ZIP}"
+  echo "VOSK model ready at: ${VOSK_MODEL_DEST}"
 fi
-
 
 

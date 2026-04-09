@@ -29,7 +29,7 @@ IMPORTANT STEP
 
 You need to install all requirements from official documentation.
 
-Some files from the `developer-zone` that need to be installed are located in hailort_requirements_files folder
+Some files from the `developer-zone` that need to be installed are located in requirements_files folder
 
 https://hailo.ai/developer-zone/documentation/hailort-v4-20-0/?sp_referrer=install/install.html
 
@@ -52,7 +52,7 @@ https://hailo.ai/developer-zone/documentation/hailort-v4-20-0/?sp_referrer=insta
 
 4. Install .whl in environment
     ```shell
-    pip install hailort_requirements_files/hailort-4.20.0-cp311-cp311-linux_aarch64.whl
+    pip install requirements_files/hailort-4.20.0-cp311-cp311-linux_aarch64.whl
     ```
    
     The PyHailoRT version must match the installed HailoRT version. NOTE: This step is not necessary for Raspberry Pi 5 users who installed the hailo-all package, since the venv will inherit the system package.
@@ -106,7 +106,7 @@ You can change port by changing it in `docker-compose.yaml` or `Makefile` in loc
 
 ### EXTRA
 
-If you need another .deb and .whl files, you can add them in hailort_requirements_files folder and change pathes
+If you need another .deb and .whl files, you can add them in requirements_files folder and change pathes
 
 Here is also a simple example of how to send voice_files to this service
     
@@ -187,6 +187,8 @@ python ./client/talk.transkribe.py --save --output-dir ./my_chunks
 
 ## How to download additional models
 
+### Hailo
+
 Described info [here](https://github.com/hailo-ai/Hailo-Application-Code-Examples/blob/main/runtime/python/speech_recognition/app/download_resources.py)
 
 
@@ -225,7 +227,12 @@ FILES = {
 
 ```
 
+### Vosk
+
+[Documentation](https://alphacephei.com/vosk/install)
+
 VOSK model can be found on [official site](https://alphacephei.com/vosk/models)
 - on pi5 vosk model perform better (quality and speed) then hailo models. Checke with:
  - vosk-model-uk-v3
  - vosk-model-uk-v3-lgraph
+ 

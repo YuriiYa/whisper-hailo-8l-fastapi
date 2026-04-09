@@ -13,14 +13,14 @@ class HefUtils:
         Returns:
             str: Path to the encoder HEF file.
         """
-        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
         hw_arch = (hw_arch or "").upper()
         variant = (variant or "base").lower()
 
         if variant == "base":
             hef_path = os.path.join(
                 base_path,
-                "infrastructure",
+                "requirements_files",
                 "hefs",
                 "h8",
                 "base",
@@ -28,9 +28,9 @@ class HefUtils:
             )
         elif variant == "tiny":
             if hw_arch == "HAILO8L":
-                hef_path = os.path.join(base_path, 'infrastructure', 'hefs', 'h8l', 'tiny', 'tiny-whisper-encoder-10s_15dB_h8l.hef')
+                hef_path = os.path.join(base_path, 'requirements_files', 'hefs', 'h8l', 'tiny', 'tiny-whisper-encoder-10s_15dB_h8l.hef')
             else:
-                hef_path = os.path.join(base_path, 'infrastructure', 'hefs', 'h8', 'tiny', 'tiny-whisper-encoder-10s_15dB.hef')
+                hef_path = os.path.join(base_path, 'requirements_files', 'hefs', 'h8', 'tiny', 'tiny-whisper-encoder-10s_15dB.hef')
         else:
             raise ValueError(f"Unsupported WHISPER_VARIANT: {variant}. Supported variants: tiny/base")
 
@@ -50,14 +50,14 @@ class HefUtils:
         Returns:
             str: Path to the decoder HEF file.
         """
-        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
         hw_arch = (hw_arch or "").upper()
         variant = (variant or "base").lower()
 
         if variant == "base":
             hef_path = os.path.join(
                 base_path,
-                "infrastructure",
+                "requirements_files",
                 "hefs",
                 "h8",
                 "base",
@@ -65,10 +65,10 @@ class HefUtils:
             )
         elif variant == "tiny":
             if hw_arch == "HAILO8L":
-                hef_path = os.path.join(base_path, 'infrastructure', 'hefs', "h8l", "tiny",
+                hef_path = os.path.join(base_path, 'requirements_files', 'hefs', "h8l", "tiny",
                                         "tiny-whisper-decoder-fixed-sequence-matmul-split_h8l.hef")
             else:
-                hef_path = os.path.join(base_path, "infrastructure", "hefs", "h8", "tiny",
+                hef_path = os.path.join(base_path, "requirements_files", "hefs", "h8", "tiny",
                                         "tiny-whisper-decoder-fixed-sequence-matmul-split.hef")
         else:
             raise ValueError(f"Unsupported WHISPER_VARIANT: {variant}. Supported variants: tiny/base")

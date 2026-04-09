@@ -44,7 +44,7 @@ RUN mkdir /home/usr/whisper-hailo-8l-fastapi
 WORKDIR /home/usr/whisper-hailo-8l-fastapi
 
 COPY ./app ./app
-COPY ./hailort_requirements_files ./hailort_requirements_files
+COPY ./requirements_files ./requirements_files
 COPY ./download_resources.sh ./download_resources.sh
 COPY ./poetry.lock ./poetry.lock
 COPY ./pyproject.toml ./pyproject.toml
@@ -53,11 +53,11 @@ COPY ./setup.py ./setup.py
 RUN poetry install
 
 
-RUN dpkg --unpack hailort_requirements_files/hailort-pcie-driver_4.20.0_all.deb
-RUN dpkg --unpack hailort_requirements_files/hailort_4.20.0_arm64.deb
+RUN dpkg --unpack requirements_files/hailort-pcie-driver_4.20.0_all.deb
+RUN dpkg --unpack requirements_files/hailort_4.20.0_arm64.deb
 
 ENV PATH="/home/wyoming_hailo_whisper/.venv/bin:$PATH"
-RUN poetry run pip install hailort_requirements_files/hailort-4.20.0-cp311-cp311-linux_aarch64.whl
+RUN poetry run pip install requirements_files/hailort-4.20.0-cp311-cp311-linux_aarch64.whl
 
 RUN ./download_resources.sh
 
