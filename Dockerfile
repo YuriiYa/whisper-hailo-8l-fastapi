@@ -52,6 +52,7 @@ COPY ./pyproject.toml ./pyproject.toml
 COPY ./setup.py ./setup.py
 
 RUN poetry install
+RUN poetry run pip install piper-tts
 
 
 RUN dpkg --unpack requirements_files/hailort-pcie-driver_4.20.0_all.deb

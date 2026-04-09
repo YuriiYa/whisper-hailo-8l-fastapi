@@ -23,6 +23,7 @@ python-multipart = "^0.0.20"
 asyncio = "^3.4.3"
 wyoming = "^1.7.1"
 vosk = "^0.3.45"
+piper-tts = "*"
 
 
 [build-system]

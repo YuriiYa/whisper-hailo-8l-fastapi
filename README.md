@@ -67,8 +67,8 @@ Using docker-compose instead of Docker will make it much easier to launch the se
 
 2. TTS is enabled in compose with defaults:
     ```
-    TTS_ENGINE_BINARY="espeak-ng"
-    TTS_DEFAULT_VOICE="uk"
+    TTS_ENGINE_BINARY="espeak-ng"   # espeak-ng | piper
+    TTS_DEFAULT_VOICE="uk"          # espeak voice code OR piper .onnx model path
     TTS_DEFAULT_SPEED="170"
     ```
 
@@ -124,12 +124,26 @@ The service includes a local TTS endpoint with support for multiple engines.
 - Lower quality synthesis
 - Install: `sudo apt update && sudo apt install -y espeak-ng`
 
+**Piper** (neural, recommended on RP5):
+- Fast neural TTS on ARM/aarch64
+- Better speech quality with compact models
+- Install: `pip install piper-tts`
+- Set `TTS_DEFAULT_VOICE` to a Piper `.onnx` voice model path (or pass that path in request `voice`)
+
 #### Environment Variables
 
 ```shell
-TTS_ENGINE_BINARY="espeak-ng"
-TTS_DEFAULT_VOICE="uk"             # Ukrainian
+TTS_ENGINE_BINARY="espeak-ng"      # espeak-ng | piper
+TTS_DEFAULT_VOICE="uk"             # espeak voice code OR piper model path
 TTS_DEFAULT_SPEED="170"            # 0-450
+```
+
+Piper example:
+
+```shell
+TTS_ENGINE_BINARY="piper"
+TTS_DEFAULT_VOICE="/opt/piper/uk_UA-lada-medium.onnx"
+TTS_DEFAULT_SPEED="170"
 ```
 
 #### Request example

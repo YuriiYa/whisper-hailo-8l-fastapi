@@ -1,3 +1,5 @@
+## Examples for testing TTS endpoint with curl and aplay:
+
 curl -s -X POST "http://localhost:54322/tts" \
   -H "Content-Type: application/json" \
   -d '{"text":"Привіт! Це перевірка озвучення.","voice":"uk","speed":100}' \
