@@ -25,8 +25,8 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     espeak-ng \
     libportaudio2 \
-    wget \
     make \
+    unzip \
     git
     
 RUN curl https://pyenv.run | bash

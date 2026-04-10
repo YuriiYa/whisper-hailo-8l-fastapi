@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -e
 REQ="requirements_files"
 
 # ---------------------------------------------------------------------------
@@ -117,12 +118,30 @@ VOSK_MODEL_DEST="${REQ}/${VOSK_MODEL_NAME}"
 if [ -d "${VOSK_MODEL_DEST}" ]; then
   echo "VOSK model '${VOSK_MODEL_NAME}' already exists, skipping download."
 else
+  echo "=========================================="
   echo "Downloading VOSK model ${VOSK_MODEL_NAME}..."
-  wget -q --show-progress -P "${REQ}" "${VOSK_MODEL_URL}"
-  echo "Extracting ${VOSK_MODEL_ZIP}..."
-  unzip -q "${REQ}/${VOSK_MODEL_ZIP}" -d "${REQ}"
+  echo "URL: ${VOSK_MODEL_URL}"
+  echo "=========================================="
+  if ! wget --show-progress -O "${REQ}/${VOSK_MODEL_ZIP}" "${VOSK_MODEL_URL}"; then
+    echo "ERROR: Failed to download ${VOSK_MODEL_ZIP}. Check network connectivity and URL."
+    exit 1
+  fi
+  
+  echo "Extracting ${VOSK_MODEL_ZIP} to ${REQ}..."
+  if ! unzip -q "${REQ}/${VOSK_MODEL_ZIP}" -d "${REQ}"; then
+    echo "ERROR: Failed to extract ${VOSK_MODEL_ZIP}. unzip may not be installed."
+    exit 1
+  fi
+  
+  if [ ! -d "${VOSK_MODEL_DEST}" ]; then
+    echo "ERROR: Extraction succeeded but directory not found at ${VOSK_MODEL_DEST}"
+    exit 1
+  fi
+  
   rm "${REQ}/${VOSK_MODEL_ZIP}"
-  echo "VOSK model ready at: ${VOSK_MODEL_DEST}"
+  echo "=========================================="
+  echo "✓ VOSK model ready at: ${VOSK_MODEL_DEST}"
+  echo "=========================================="
 fi
 
 
