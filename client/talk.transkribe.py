@@ -699,7 +699,7 @@ def main() -> None:
                             )
                             if answer:
                                 spoken_text = answer
-                                print("[ask] Gemini answer received.")
+                                print(f"[ask] Gemini answer received: {answer}")
                             else:
                                 spoken_text = "Вибачте, зараз не вдалося отримати відповідь. Спробуйте ще раз, будь ласка."
 

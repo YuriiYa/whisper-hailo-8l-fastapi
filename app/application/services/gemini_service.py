@@ -3,6 +3,11 @@ from urllib import error, request
 
 
 class GeminiService:
+    RESPONSE_LENGTH_SYSTEM_PROMPT = (
+        "You are a concise assistant, aswering very laconically. Respond in 2 to 5 complete sentences. "
+        "Do not use bullet points unless explicitly requested."
+    )
+
     def __init__(self, api_key: str, model: str, timeout_seconds: int = 30):
         self.api_key = (api_key or "").strip()
         self.model = (model or "").strip()
@@ -20,6 +25,13 @@ class GeminiService:
         )
 
         payload = {
+            "system_instruction": {
+                "parts": [
+                    {
+                        "text": self.RESPONSE_LENGTH_SYSTEM_PROMPT,
+                    }
+                ]
+            },
             "contents": [
                 {
                     "parts": [
