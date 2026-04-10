@@ -6,9 +6,11 @@ import io
 import json
 import os
 import queue
+import re
 import threading
 import time
 import wave
+from dataclasses import dataclass
 from typing import Optional, Union
 
 import numpy as np
@@ -16,12 +18,91 @@ import requests
 import sounddevice as sd
 
 DEFAULT_URL = "http://localhost:54322/transcribe"
+DEFAULT_TTS_URL = "http://localhost:54322/tts"
 DEFAULT_SAMPLE_RATE = 16000
 DEFAULT_CHANNELS = 1
 DEFAULT_CHUNK_SECONDS = 10
 DEFAULT_STEP_MS = 1000
 DEFAULT_OVERLAP_SECONDS = 1.0
 DEFAULT_OUTPUT_DIR = "recorded_chunks"
+
+START_WORDS = ("start", "старт")
+STOP_WORDS = ("end", "стоп", "кінець" )
+
+
+@dataclass
+class TranscriptionResult:
+    chunk_index: int
+    worker_id: int
+    status_code: int
+    elapsed_seconds: float
+    payload: object | None
+    raw_response_text: str
+    transcript_text: str
+
+
+class CaptureSessionState:
+    """Track start/stop driven aggregation across transcribed chunks."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._capture_active = False
+        self._captured_text_parts: list[str] = []
+        self._finalized_text: Optional[str] = None
+
+    @staticmethod
+    def _contains_word(text: str, words: tuple[str, ...]) -> bool:
+        if not text:
+            return False
+        lowered = text.lower()
+        return any(re.search(rf"(?<!\w){re.escape(word)}(?!\w)", lowered) for word in words)
+
+    @staticmethod
+    def _strip_words(text: str, words: tuple[str, ...]) -> str:
+        if not text:
+            return ""
+        out = text
+        for word in words:
+            out = re.sub(rf"(?i)(?<!\w){re.escape(word)}(?!\w)", " ", out)
+        return re.sub(r"\s+", " ", out).strip()
+
+    def handle_transcript(self, transcript_text: str) -> tuple[bool, bool, str, Optional[str]]:
+        """
+        Update state using a transcribed text chunk.
+
+        Returns: started_now, stopped_now, chunk_text_for_tts, finalized_text.
+        """
+        has_start = self._contains_word(transcript_text, START_WORDS)
+        has_stop = self._contains_word(transcript_text, STOP_WORDS)
+        cleaned_text = self._strip_words(self._strip_words(transcript_text, START_WORDS), STOP_WORDS)
+
+        with self._lock:
+            started_now = False
+            stopped_now = False
+            chunk_text_for_tts = ""
+            finalized_text = None
+
+            if has_start and not self._capture_active:
+                self._capture_active = True
+                self._captured_text_parts = []
+                started_now = True
+
+            if self._capture_active and cleaned_text:
+                self._captured_text_parts.append(cleaned_text)
+                chunk_text_for_tts = cleaned_text
+
+            if has_stop and self._capture_active:
+                finalized_text = " ".join(self._captured_text_parts).strip()
+                self._finalized_text = finalized_text
+                self._capture_active = False
+                self._captured_text_parts = []
+                stopped_now = True
+
+        return started_now, stopped_now, chunk_text_for_tts, finalized_text
+
+    def get_finalized_text(self) -> str:
+        with self._lock:
+            return (self._finalized_text or "").strip()
 
 
 def list_input_devices() -> None:
@@ -74,10 +155,115 @@ def send_for_transcription(url: str, wav_bytes: bytes, timeout: int) -> requests
     return requests.post(url, files=files, timeout=timeout)
 
 
+def resolve_tts_url(transcribe_url: str, tts_url: Optional[str]) -> str:
+    """Use explicit --tts-url or derive it from --url by swapping /transcribe -> /tts."""
+    if tts_url:
+        return tts_url
+    if transcribe_url.endswith("/transcribe"):
+        return f"{transcribe_url[:-len('/transcribe')]}/tts"
+    return DEFAULT_TTS_URL
+
+
+def extract_transcript_text(payload: object | None, fallback_text: str) -> str:
+    """Best-effort extraction of transcript text from API response payload."""
+    if isinstance(payload, dict):
+        message = payload.get("message")
+        if isinstance(message, str):
+            return message.strip()
+        if isinstance(message, list):
+            return " ".join(str(item) for item in message if item is not None).strip()
+        if isinstance(message, dict):
+            nested_text = message.get("text") or message.get("message")
+            if isinstance(nested_text, str):
+                return nested_text.strip()
+        text_field = payload.get("text")
+        if isinstance(text_field, str):
+            return text_field.strip()
+    elif isinstance(payload, str):
+        return payload.strip()
+
+    return (fallback_text or "").strip()
+
+
+def request_tts_wav_bytes(
+    tts_url: str,
+    text: str,
+    timeout_seconds: int,
+    voice: Optional[str],
+    speed: Optional[int],
+) -> Optional[bytes]:
+    """Synthesize text to WAV bytes via /tts endpoint."""
+    payload: dict[str, object] = {"text": text}
+    if voice:
+        payload["voice"] = voice
+    if speed is not None:
+        payload["speed"] = speed
+
+    try:
+        response = requests.post(tts_url, json=payload, timeout=timeout_seconds)
+        if response.status_code >= 400:
+            body_preview = response.text.strip()[:200]
+            print(f"[tts][error] status={response.status_code}, body={body_preview}")
+            return None
+        return response.content
+    except requests.RequestException as exc:
+        print(f"[tts][error] request failed: {exc}")
+        return None
+
+
+def play_wav_bytes(wav_bytes: bytes) -> None:
+    """Play WAV bytes through default output device."""
+    try:
+        with wave.open(io.BytesIO(wav_bytes), "rb") as wav_file:
+            channels = wav_file.getnchannels()
+            sample_width = wav_file.getsampwidth()
+            sample_rate = wav_file.getframerate()
+            frame_count = wav_file.getnframes()
+            pcm = wav_file.readframes(frame_count)
+    except wave.Error as exc:
+        print(f"[tts][error] invalid WAV data: {exc}")
+        return
+
+    if sample_width != 2:
+        print(f"[tts][warn] unsupported sample width: {sample_width * 8} bits")
+        return
+
+    audio = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+    if channels > 1:
+        audio = audio.reshape(-1, channels)
+
+    try:
+        sd.play(audio, samplerate=sample_rate)
+        sd.wait()
+    except Exception as exc:
+        print(f"[tts][error] playback failed: {exc}")
+
+
+def handle_tts_and_playback(text: str, args: argparse.Namespace, tts_url: str, label: str) -> None:
+    """Synthesize and play text if it is not empty."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return
+
+    wav_bytes = request_tts_wav_bytes(
+        tts_url=tts_url,
+        text=cleaned,
+        timeout_seconds=args.timeout,
+        voice=args.tts_voice,
+        speed=args.tts_speed,
+    )
+    if wav_bytes is None:
+        return
+
+    print(f"[tts] playing {label} ({len(cleaned)} chars)")
+    play_wav_bytes(wav_bytes)
+
+
 def transcribe_worker(
     worker_id: int,
     stop_event: threading.Event,
     transcribe_queue: "queue.Queue[tuple[int, np.ndarray]]",
+    result_queue: "queue.Queue[TranscriptionResult]",
     args: argparse.Namespace,
 ) -> None:
     """Consume queued chunks and send them for transcription."""
@@ -92,6 +278,17 @@ def transcribe_worker(
             print(f"[chunk {chunk_index}] level: rms={rms:.6f}, peak={peak:.6f}")
             if peak < 0.005:
                 print("[warn] very low input level detected; check mic device/gain/mute")
+                result_queue.put(
+                    TranscriptionResult(
+                        chunk_index=chunk_index,
+                        worker_id=worker_id,
+                        status_code=0,
+                        elapsed_seconds=0.0,
+                        payload={"message": ""},
+                        raw_response_text="",
+                        transcript_text="",
+                    )
+                )
                 continue
 
             wav_bytes = to_wav_bytes(audio, args.sample_rate, args.channels)
@@ -102,21 +299,52 @@ def transcribe_worker(
             started = time.time()
             response = send_for_transcription(args.url, wav_bytes, args.timeout)
             elapsed = time.time() - started
-
-            print(
-                f"\n[chunk {chunk_index}] worker={worker_id} "
-                f"status={response.status_code} ({elapsed:.2f}s)"
-            )
+            payload = None
+            raw_response_text = response.text
             try:
                 payload = response.json()
-                print(json.dumps(payload, indent=2, ensure_ascii=False))
             except ValueError:
-                print(response.text)
+                payload = None
+
+            transcript_text = extract_transcript_text(payload, raw_response_text)
+            result_queue.put(
+                TranscriptionResult(
+                    chunk_index=chunk_index,
+                    worker_id=worker_id,
+                    status_code=response.status_code,
+                    elapsed_seconds=elapsed,
+                    payload=payload,
+                    raw_response_text=raw_response_text,
+                    transcript_text=transcript_text,
+                )
+            )
         except requests.RequestException as exc:
             print(f"[error] worker={worker_id} request failed: {exc}")
+            result_queue.put(
+                TranscriptionResult(
+                    chunk_index=chunk_index,
+                    worker_id=worker_id,
+                    status_code=-1,
+                    elapsed_seconds=0.0,
+                    payload=None,
+                    raw_response_text=str(exc),
+                    transcript_text="",
+                )
+            )
             time.sleep(0.2)
         except Exception as exc:
             print(f"[error] worker={worker_id} unexpected: {exc}")
+            result_queue.put(
+                TranscriptionResult(
+                    chunk_index=chunk_index,
+                    worker_id=worker_id,
+                    status_code=-1,
+                    elapsed_seconds=0.0,
+                    payload=None,
+                    raw_response_text=str(exc),
+                    transcript_text="",
+                )
+            )
             time.sleep(0.2)
         finally:
             transcribe_queue.task_done()
@@ -189,6 +417,22 @@ def main() -> None:
         default=1,
         help="Number of parallel transcription workers",
     )
+    parser.add_argument(
+        "--tts-url",
+        default=None,
+        help="TTS endpoint URL (default: derived from --url)",
+    )
+    parser.add_argument(
+        "--tts-voice",
+        default="uk",
+        help="Voice passed to /tts endpoint",
+    )
+    parser.add_argument(
+        "--tts-speed",
+        type=int,
+        default=170,
+        help="Speech speed passed to /tts endpoint",
+    )
     args = parser.parse_args()
 
     if args.chunk_seconds <= 0:
@@ -203,6 +447,11 @@ def main() -> None:
     if args.workers <= 0:
         print("[error] --workers must be > 0")
         return
+    if args.tts_speed <= 0:
+        print("[error] --tts-speed must be > 0")
+        return
+
+    tts_url = resolve_tts_url(args.url, args.tts_url)
 
     list_input_devices()
 
@@ -254,16 +503,23 @@ def main() -> None:
     print(
         f"[start] audio={args.sample_rate}Hz, channels={args.channels}, "
         f"chunk={args.chunk_seconds:.3f}s, step_ms={args.step_ms}, "
-        f"overlap~{overlap_seconds_effective:.3f}s, workers={args.workers}"
+        f"overlap~{overlap_seconds_effective:.3f}s, workers={args.workers}, "
+        f"tts={tts_url}"
     )
+    print("[info] Session keywords: start/старт to begin, end/стоп to finalize")
     print("[info] Press Ctrl+C to stop.")
 
     audio_frame_queue: "queue.Queue[np.ndarray]" = queue.Queue(maxsize=512)
     transcribe_queue: "queue.Queue[tuple[int, np.ndarray]]" = queue.Queue(maxsize=64)
+    result_queue: "queue.Queue[TranscriptionResult]" = queue.Queue(maxsize=128)
     stop_event = threading.Event()
+    pause_capture_event = threading.Event()
+    session_state = CaptureSessionState()
 
     def audio_callback(indata, frames, time_info, status):
         del frames, time_info
+        if pause_capture_event.is_set():
+            return
         if status:
             print(f"[audio][warn] {status}")
         try:
@@ -279,11 +535,68 @@ def main() -> None:
     for worker_idx in range(args.workers):
         t = threading.Thread(
             target=transcribe_worker,
-            args=(worker_idx + 1, stop_event, transcribe_queue, args),
+            args=(worker_idx + 1, stop_event, transcribe_queue, result_queue, args),
             daemon=True,
         )
         t.start()
         workers.append(t)
+
+    def result_processor() -> None:
+        """Process worker outputs in chunk order for stable start/stop handling."""
+        pending_results: dict[int, TranscriptionResult] = {}
+        next_chunk = 1
+
+        while not stop_event.is_set() or not result_queue.empty() or pending_results:
+            try:
+                result = result_queue.get(timeout=0.2)
+                pending_results[result.chunk_index] = result
+                result_queue.task_done()
+            except queue.Empty:
+                pass
+
+            while next_chunk in pending_results:
+                ordered_result = pending_results.pop(next_chunk)
+                print(
+                    f"\n[chunk {ordered_result.chunk_index}] worker={ordered_result.worker_id} "
+                    f"status={ordered_result.status_code} ({ordered_result.elapsed_seconds:.2f}s)"
+                )
+                if ordered_result.payload is not None:
+                    print(json.dumps(ordered_result.payload, indent=2, ensure_ascii=False))
+                else:
+                    print(ordered_result.raw_response_text)
+
+                transcript_text = ordered_result.transcript_text
+                started, stopped, _, finalized_text = session_state.handle_transcript(transcript_text)
+
+                if started:
+                    print("[session] Start keyword detected. Capturing transcript chunks.")
+
+                if stopped:
+                    print("[session] Stop keyword detected. Finalizing captured text.")
+                    final_text = (finalized_text or "").strip()
+                    print("\n[session] Aggregated text:")
+                    print(final_text if final_text else "(empty)")
+                    if final_text:
+                        pause_capture_event.set()
+                        # Drop buffered mic frames to avoid processing stale audio after playback.
+                        while True:
+                            try:
+                                audio_frame_queue.get_nowait()
+                            except queue.Empty:
+                                break
+                        handle_tts_and_playback(
+                            text=final_text,
+                            args=args,
+                            tts_url=tts_url,
+                            label="final aggregated text",
+                        )
+                        pause_capture_event.clear()
+                    print("[session] Listening continues. Say start/старт for a new session.")
+
+                next_chunk += 1
+
+    result_thread = threading.Thread(target=result_processor, daemon=True)
+    result_thread.start()
 
     rolling = np.empty((0, args.channels), dtype=np.float32)
     samples_since_emit = 0
@@ -300,7 +613,11 @@ def main() -> None:
         ):
             print("[recording] streaming microphone input...")
             while True:
-                frame = audio_frame_queue.get(timeout=0.5)
+                try:
+                    frame = audio_frame_queue.get(timeout=0.5)
+                except queue.Empty:
+                    continue
+
                 if frame.ndim == 1:
                     frame = frame.reshape(-1, 1)
 
@@ -333,6 +650,7 @@ def main() -> None:
         stop_event.set()
         for t in workers:
             t.join(timeout=1.5)
+        result_thread.join(timeout=2.0)
 
 
 if __name__ == "__main__":
