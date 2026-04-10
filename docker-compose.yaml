@@ -13,6 +13,9 @@ services:
       TTS_ENGINE_BINARY: "piper"   # espeak-ng or piper
       TTS_DEFAULT_VOICE: "requirements_files/piper_models/uk/uk_UA-ukrainian_tts-medium.onnx"          # espeak voice code 'uk' OR piper model path (.onnx)
       TTS_DEFAULT_SPEED: "170"
+      GEMINI_API_KEY: ""
+      GEMINI_MODEL: "gemini-2.5-flash-lite"
+      GEMINI_TIMEOUT_SECONDS: "30"
     ports:
       - "10300:10300"                  # TCP  port for Wyoming Protocol
       - "54322:54322"                  # HTTP port for FastAPI

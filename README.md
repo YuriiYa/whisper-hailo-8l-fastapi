@@ -75,6 +75,12 @@ Using docker-compose instead of Docker will make it much easier to launch the se
 3. Run service
     ```shell
     docker compose up --build
+
+    #### When you want to guarantee a completely fresh build and then start services separately
+    docker compose build --no-cache
+    docker compose up
+    
+
     ```
 
 #### Local

@@ -10,8 +10,10 @@ system_logger = logging.getLogger(__name__)
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 4000  # samples per ffmpeg read
 
-# Project root is 3 levels up from this file (app/application/pipelines/)
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
+# App root is 3 levels up from this file (app/application/pipelines/)
+_APP_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir))
+# Repository root is one level above app root
+_REPO_ROOT = os.path.abspath(os.path.join(_APP_ROOT, os.pardir))
 
 
 class VoskPipeline:
@@ -25,9 +27,15 @@ class VoskPipeline:
     """
 
     def __init__(self, model_path: str):
-        # If the path is relative, resolve it from the project root
+        # If the path is relative, resolve it against common roots used by local and container runs.
         if not os.path.isabs(model_path):
-            model_path = os.path.join(_PROJECT_ROOT, model_path)
+            candidates = [
+                os.path.join(_REPO_ROOT, model_path),
+                os.path.join(_APP_ROOT, model_path),
+                os.path.abspath(model_path),
+            ]
+            existing = next((path for path in candidates if os.path.isdir(path)), None)
+            model_path = existing or candidates[0]
         system_logger.info("Loading VOSK model from: %s", model_path)
         self.model = Model(model_path)
         system_logger.info("VOSK model loaded successfully")

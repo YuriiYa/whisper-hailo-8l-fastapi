@@ -19,6 +19,7 @@ import sounddevice as sd
 
 DEFAULT_URL = "http://localhost:54322/transcribe"
 DEFAULT_TTS_URL = "http://localhost:54322/tts"
+DEFAULT_ASK_URL = "http://localhost:54322/ask"
 DEFAULT_SAMPLE_RATE = 16000
 DEFAULT_CHANNELS = 1
 DEFAULT_CHUNK_SECONDS = 10
@@ -164,6 +165,23 @@ def resolve_tts_url(transcribe_url: str, tts_url: Optional[str]) -> str:
     return DEFAULT_TTS_URL
 
 
+def resolve_ask_url(transcribe_url: str, ask_url: Optional[str]) -> str:
+    """Use explicit --ask-url or derive it from --url by swapping /transcribe -> /ask."""
+    if ask_url:
+        return ask_url
+    if transcribe_url.endswith("/transcribe"):
+        return f"{transcribe_url[:-len('/transcribe')]}/ask"
+    return DEFAULT_ASK_URL
+
+
+def resolve_ask_health_url(ask_url: str) -> str:
+    """Derive readiness endpoint from ask endpoint URL."""
+    normalized = ask_url.rstrip("/")
+    if normalized.endswith("/ask"):
+        return f"{normalized}/health"
+    return f"{normalized}/ask/health"
+
+
 def extract_transcript_text(payload: object | None, fallback_text: str) -> str:
     """Best-effort extraction of transcript text from API response payload."""
     if isinstance(payload, dict):
@@ -183,6 +201,66 @@ def extract_transcript_text(payload: object | None, fallback_text: str) -> str:
         return payload.strip()
 
     return (fallback_text or "").strip()
+
+
+def request_gemini_answer(ask_url: str, question: str, timeout_seconds: int) -> Optional[str]:
+    """Send a finalized question to /ask endpoint and return Gemini answer text."""
+    try:
+        response = requests.post(
+            ask_url,
+            json={"question": question},
+            timeout=timeout_seconds,
+        )
+    except requests.RequestException as exc:
+        print(f"[ask][error] request failed: {exc}")
+        return None
+
+    if response.status_code >= 400:
+        body_preview = response.text.strip()[:200]
+        print(f"[ask][error] status={response.status_code}, body={body_preview}")
+        return None
+
+    try:
+        payload = response.json()
+    except ValueError:
+        print("[ask][error] invalid JSON response")
+        return None
+
+    answer = payload.get("answer")
+    if isinstance(answer, str):
+        return answer.strip()
+
+    print("[ask][error] no 'answer' field in response")
+    return None
+
+
+def request_gemini_readiness(
+    ask_health_url: str,
+    timeout_seconds: int,
+) -> tuple[Optional[bool], str, str]:
+    """Query /ask/health and return (ready, detail, model)."""
+    try:
+        response = requests.get(ask_health_url, timeout=timeout_seconds)
+    except requests.RequestException as exc:
+        return None, f"health request failed: {exc}", "unknown"
+
+    if response.status_code >= 400:
+        body_preview = response.text.strip()[:200]
+        return None, f"health status={response.status_code}, body={body_preview}", "unknown"
+
+    try:
+        payload = response.json()
+    except ValueError:
+        return None, "health response is not valid JSON", "unknown"
+
+    ready = payload.get("ready")
+    detail = payload.get("detail")
+    model = payload.get("model")
+
+    ready_value = ready if isinstance(ready, bool) else None
+    detail_value = detail if isinstance(detail, str) else "No detail provided"
+    model_value = model if isinstance(model, str) and model.strip() else "unknown"
+    return ready_value, detail_value, model_value
 
 
 def request_tts_wav_bytes(
@@ -423,6 +501,16 @@ def main() -> None:
         help="TTS endpoint URL (default: derived from --url)",
     )
     parser.add_argument(
+        "--ask-url",
+        default=None,
+        help="Gemini ask endpoint URL (default: derived from --url)",
+    )
+    parser.add_argument(
+        "--no-gemini",
+        action="store_true",
+        help="Skip /ask and speak finalized text directly",
+    )
+    parser.add_argument(
         "--tts-voice",
         default="uk",
         help="Voice passed to /tts endpoint",
@@ -452,6 +540,22 @@ def main() -> None:
         return
 
     tts_url = resolve_tts_url(args.url, args.tts_url)
+    ask_url = resolve_ask_url(args.url, args.ask_url)
+    ask_health_url = resolve_ask_health_url(ask_url)
+
+    if args.no_gemini:
+        print("[ask][info] Gemini disabled by --no-gemini; skipping readiness check")
+    else:
+        ready, detail, model = request_gemini_readiness(
+            ask_health_url=ask_health_url,
+            timeout_seconds=args.timeout,
+        )
+        if ready is True:
+            print(f"[ask][ready] Gemini configured. model={model}")
+        elif ready is False:
+            print(f"[ask][warn] Gemini is not ready: {detail}")
+        else:
+            print(f"[ask][warn] Could not verify Gemini readiness: {detail}")
 
     list_input_devices()
 
@@ -504,7 +608,7 @@ def main() -> None:
         f"[start] audio={args.sample_rate}Hz, channels={args.channels}, "
         f"chunk={args.chunk_seconds:.3f}s, step_ms={args.step_ms}, "
         f"overlap~{overlap_seconds_effective:.3f}s, workers={args.workers}, "
-        f"tts={tts_url}"
+        f"tts={tts_url}, ask={ask_url}, gemini={'off' if args.no_gemini else 'on'}"
     )
     print("[info] Session keywords: start/старт to begin, end/стоп to finalize")
     print("[info] Press Ctrl+C to stop.")
@@ -584,11 +688,26 @@ def main() -> None:
                                 audio_frame_queue.get_nowait()
                             except queue.Empty:
                                 break
+
+                        spoken_text = final_text
+                        if not args.no_gemini:
+                            print("[ask] Sending finalized text to Gemini...")
+                            answer = request_gemini_answer(
+                                ask_url=ask_url,
+                                question=final_text,
+                                timeout_seconds=args.timeout,
+                            )
+                            if answer:
+                                spoken_text = answer
+                                print("[ask] Gemini answer received.")
+                            else:
+                                spoken_text = "Вибачте, зараз не вдалося отримати відповідь. Спробуйте ще раз, будь ласка."
+
                         handle_tts_and_playback(
-                            text=final_text,
+                            text=spoken_text,
                             args=args,
                             tts_url=tts_url,
-                            label="final aggregated text",
+                            label="gemini answer" if not args.no_gemini else "final aggregated text",
                         )
                         pause_capture_event.clear()
                     print("[session] Listening continues. Say start/старт for a new session.")
