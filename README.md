@@ -17,11 +17,26 @@ It was created and tested on:
 
 
 ### INFO
-It is a standalone service that uses the Hailo-8(L) chip to speed up voice recognition.
+This repository runs a speech pipeline service for local voice interaction.
 
-It can accept API and TCP requests.
+It supports:
+- FastAPI HTTP endpoints (`/transcribe`, `/ask`, `/ask/health`, `/tts`)
+- Wyoming TCP protocol (Home Assistant)
+- Hailo Whisper acceleration and VOSK mode
+- Local TTS playback workflow through the provided client script
 
-It works correctly with the wyoming protocol for Homeassistant integration
+### High-level architecture
+
+Mic -> Whisper (Hailo/VOSK) -> [start word detected] -> accumulate speech  
+-> [stop word detected] -> finalized_text (the question)  
+-> POST /ask -> GeminiService -> Gemini API  
+-> answer text -> POST /tts -> TTSService -> WAV bytes  
+-> play through speakers
+
+Start words: `start`, `старт`  
+Stop words: `end`, `стоп`, `кінець`
+
+Gemini responses are constrained by a system instruction to be concise (2-5 sentences).
 
 
 ### Pre-Installation
@@ -62,17 +77,24 @@ https://hailo.ai/developer-zone/documentation/hailort-v4-20-0/?sp_referrer=insta
 ### Run
 #### Docker-compose
 Using docker-compose instead of Docker will make it much easier to launch the service.
-
-1. If you have "Hailo-8" you need to open docker-compose.yaml and change ENV value `HAILO_VERSION`
-
-2. TTS is enabled in compose with defaults:
+1346792
+1. Configure environment values in `docker-compose.yaml` for your mode and model paths:
     ```
-    TTS_ENGINE_BINARY="espeak-ng"   # espeak-ng | piper
-    TTS_DEFAULT_VOICE="uk"          # espeak voice code OR piper .onnx model path
-    TTS_DEFAULT_SPEED="170"
+    IS_HAILO_ON_DEVICE: "FALSE"
+    HAILO_VERSION: "VOSK"                     # HAILO8 | HAILO8L | VOSK
+    WHISPER_VARIANT: "base"                  # base | tiny
+    VOSK_MODEL_PATH: "requirements_files/vosk-model-uk-v3-lgraph"
+
+    TTS_ENGINE_BINARY: "piper"               # espeak-ng | piper
+    TTS_DEFAULT_VOICE: "requirements_files/piper_models/uk/uk_UA-ukrainian_tts-medium.onnx"
+    TTS_DEFAULT_SPEED: "170"
+
+    GEMINI_API_KEY: "<your_key>"
+    GEMINI_MODEL: "gemini-2.5-flash-lite"
+    GEMINI_TIMEOUT_SECONDS: "30"
     ```
 
-3. Run service
+2. Run service
     ```shell
     docker compose up --build
 
@@ -84,11 +106,21 @@ Using docker-compose instead of Docker will make it much easier to launch the se
     ```
 
 #### Local
-1. Change .env file
+1. Change `.env` file
     ```
-    IS_HAILO_ON_DEVICE="TRUE" # if you want to run service on RP5 but on hailo chip, you need to change this value on "FALSE"
-    HAILO_VERSION="HAILO8L" # This value can be only "HAILO8L" or "HAILO8"
-    WHISPER_MULTI_PROCESS_SERVICE="FALSE" # optional: set TRUE to enable Hailo shared multi-process service mode
+    IS_HAILO_ON_DEVICE="FALSE"
+    HAILO_VERSION="VOSK" # HAILO8, HAILO8L, VOSK
+    VOSK_MODEL_PATH="requirements_files/vosk-model-uk-v3-lgraph"
+
+    TTS_ENGINE_BINARY="piper" # espeak-ng | piper
+    TTS_DEFAULT_VOICE="requirements_files/piper_models/uk/uk_UA-ukrainian_tts-medium.onnx"
+    TTS_DEFAULT_SPEED="100"
+
+    GEMINI_API_KEY=""
+    GEMINI_MODEL="gemini-2.5-flash-lite"
+    GEMINI_TIMEOUT_SECONDS="30"
+
+    WHISPER_MULTI_PROCESS_SERVICE="FALSE" # optional: shared Hailo service mode
     ```
 
    Notes:
@@ -97,12 +129,7 @@ Using docker-compose instead of Docker will make it much easier to launch the se
    - If multiple clients call `/transcribe` at the same time, requests are queued and may wait for previous jobs to finish.
    - `WHISPER_MULTI_PROCESS_SERVICE` enables Hailo shared service mode in the pipeline configuration, but API-level access remains serialized for correctness.
 
-2. In file app/application/pipelines/hailo_whisper_pipeline you need to comment out `line 11`
-    ```
-    from hailo_platform import (HEF, VDevice, HailoSchedulingAlgorithm, FormatType)
-    ```
-
-3. Run service
+2. Run service
     ```shell
     make run
     ```
@@ -115,9 +142,27 @@ Wyoming protocol is using TCP connection with port `10300`
 #### API
 For standard requests of your services you can use port `54322` with route `/transcribe`
 
+For Gemini QA, use route `/ask`.
+
+For Gemini readiness check, use route `/ask/health`.
+
 For text-to-speech, use route `/tts` (returns `audio/wav`).
 
 You can change port by changing it in `docker-compose.yaml` or `Makefile` in local
+
+#### API examples
+
+`/ask`:
+```shell
+curl -X POST "http://localhost:54322/ask" \
+    -H "Content-Type: application/json" \
+    -d '{"question":"Яка зараз погода в Києві?"}'
+```
+
+`/ask/health`:
+```shell
+curl "http://localhost:54322/ask/health"
+```
 
 ### Minimal TTS (Ukrainian)
 
@@ -191,6 +236,7 @@ If you have this error, you should reinstall your .venv, because something went 
 
 The script `client/talk.transkribe.py` continuously records microphone audio,
 sends each chunk to `/transcribe`, and prints the server response.
+When a start/stop session is completed, it can call `/ask` and then `/tts`, then play the returned WAV.
 If `--save` is provided, it also saves each chunk to a local WAV file.
 
 ### Install dependencies
@@ -211,14 +257,16 @@ python ./client/talk.transkribe.py --chunk-seconds 10
 5. Prints chunk level diagnostics (`rms` and `peak`) to help detect silent input.
 6. If `--save` is set, saves chunks to `recorded_chunks/chunk_000001.wav`, `chunk_000002.wav`, etc.
 7. Sends each chunk as multipart form-data (`file`) to the endpoint.
-8. Prints HTTP status and JSON/text response to console.
-9. Repeats until stopped with `Ctrl+C`.
+8. Detects start/stop words and aggregates spoken text between them.
+9. On stop word: sends aggregated text to `/ask` (unless `--no-gemini`), then sends answer to `/tts`.
+10. Plays WAV audio through speakers.
+11. Repeats until stopped with `Ctrl+C`.
 
 ### Useful options
 - `--url`: API endpoint (default: `http://localhost:54322/transcribe`)
 - `--chunk-seconds`: chunk size in seconds (default: `10`)
 - `--sample-rate`: input sample rate in Hz (default: `16000`)
-- `--channels`: number of channels (default: `0`)
+- `--channels`: number of channels (default: `1`)
 - `--timeout`: HTTP timeout in seconds (default: `60`)
 - `--save`: save each recorded chunk as `.wav`
 - `--output-dir`: folder for saved WAV chunks (default: `recorded_chunks`)
@@ -227,11 +275,27 @@ python ./client/talk.transkribe.py --chunk-seconds 10
 - `--step-ms`: how far the window moves each time in ms. Step 9000 ms means:0-10, 9-19, 18-28, ...
 - `--overlap-seconds`: Minimum overlap 
 - `--workers`: is how many parallel transcription threads the client uses to send chunks to your API.
+- `--tts-url`: custom TTS endpoint (default derived from `--url`)
+- `--ask-url`: custom Gemini endpoint (default derived from `--url`)
+- `--no-gemini`: skip `/ask` and speak finalized text directly
+- `--tts-voice`: voice passed to `/tts` (default: `uk`)
+- `--tts-speed`: speed passed to `/tts` (default: `170`)
 
 ### Examples
 
 ```shell
 python ./client/talk.transkribe.py --chunk-seconds 10 --step-ms 9000 --overlap-seconds 1.0 --workers 1 --save
+
+# Full voice Q&A flow (start/старт ... end/стоп)
+python ./client/talk.transkribe.py --chunk-seconds 5 --step-ms 9000 --overlap-seconds 1.0 --workers 1
+
+# Use custom /ask and /tts endpoints
+python ./client/talk.transkribe.py \
+    --ask-url http://localhost:54322/ask \
+    --tts-url http://localhost:54322/tts
+
+# Disable Gemini and speak only captured final text
+python ./client/talk.transkribe.py --no-gemini
 
 # Interactive device selection
 python ./client/talk.transkribe.py --chunk-seconds 10
