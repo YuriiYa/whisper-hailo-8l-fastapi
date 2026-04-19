@@ -198,3 +198,4 @@ requirements_files/decoder_assets/*
 requirements_files/vosk-*/
 
 .env
+recorded_chunks/*

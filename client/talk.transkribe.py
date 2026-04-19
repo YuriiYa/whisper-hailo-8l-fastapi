@@ -14,21 +14,25 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 import numpy as np
+import noisereduce as nr
 import requests
 import sounddevice as sd
 
 DEFAULT_URL = "http://localhost:54322/transcribe"
 DEFAULT_TTS_URL = "http://localhost:54322/tts"
 DEFAULT_ASK_URL = "http://localhost:54322/ask"
-DEFAULT_SAMPLE_RATE = 16000
+DEFAULT_SAMPLE_RATE = 48000
 DEFAULT_CHANNELS = 1
 DEFAULT_CHUNK_SECONDS = 10
 DEFAULT_STEP_MS = 1000
 DEFAULT_OVERLAP_SECONDS = 1.0
 DEFAULT_OUTPUT_DIR = "recorded_chunks"
+DEFAULT_PEAK_THRESHOLD = 0.07
+DEFAULT_PEAK_NOISEREDU_THRESHOLD = 0.03
+NOISE_PROP_DECREASE = 0.94 # The proportion to reduce the noise by (1.0 = 100%), by default 1.0
 
-START_WORDS = ("start", "старт")
-STOP_WORDS = ("end", "стоп", "кінець" )
+START_WORDS = ("start", "старт", "початок", "почніть", "розпочніть", "розпочать", "розпочати", "починать", "починити", "стартуй", "стартуйте")
+STOP_WORDS = ("end", "стоп", "кінець", "зупиніть", "завершіть", "завершить", "завершити", "припиніть", "припинить", "припинити","зупини", "зупините", "стопуй", "стопуйте","зупинка", "стопка", "стопку", "стопкою", "стопках")
 
 
 @dataclass
@@ -126,6 +130,43 @@ def compute_levels(audio: np.ndarray) -> tuple[float, float]:
     return rms, peak
 
 
+def denoise_speech_chunk(audio: np.ndarray, sample_rate: int) -> np.ndarray:
+    """Apply noise reduction using spectral gating from noisereduce."""
+    data = np.asarray(audio, dtype=np.float32)
+    if data.ndim == 1:
+        return nr.reduce_noise(y=data, sr=sample_rate, stationary=True, prop_decrease=0.8).astype(np.float32)
+
+    denoised_channels = []
+    for channel_index in range(data.shape[1]):
+        denoised_channel = nr.reduce_noise(
+            y=data[:, channel_index],
+            sr=sample_rate,
+            stationary=True,
+            prop_decrease=NOISE_PROP_DECREASE,
+        )
+        denoised_channels.append(np.asarray(denoised_channel, dtype=np.float32))
+
+    return np.stack(denoised_channels, axis=1)
+
+
+def parse_noise_reduction_thresholds(value: str) -> tuple[float, float]:
+    """Parse threshold input as RAW_PEAK/DENOISED_PEAK floats."""
+    chunks = [part.strip() for part in value.split("/")]
+    if len(chunks) != 2:
+        raise ValueError("expected format RAW_PEAK/DENOISED_PEAK")
+
+    try:
+        peak_threshold = float(chunks[0])
+        denoised_peak_threshold = float(chunks[1])
+    except ValueError as exc:
+        raise ValueError("both thresholds must be numeric") from exc
+
+    if peak_threshold <= 0 or denoised_peak_threshold <= 0:
+        raise ValueError("thresholds must be > 0")
+
+    return peak_threshold, denoised_peak_threshold
+
+
 def to_wav_bytes(audio: np.ndarray, sample_rate: int, channels: int) -> bytes:
     """Convert float32 audio in range [-1, 1] into 16-bit PCM WAV bytes."""
     clipped = np.clip(audio, -1.0, 1.0)
@@ -141,10 +182,10 @@ def to_wav_bytes(audio: np.ndarray, sample_rate: int, channels: int) -> bytes:
     return wav_buffer.getvalue()
 
 
-def save_chunk_wav(output_dir: str, chunk_index: int, wav_bytes: bytes) -> str:
+def save_chunk_wav(output_dir: str, chunk_index: str, wav_bytes: bytes) -> str:
     """Save WAV bytes to disk and return the saved file path."""
     os.makedirs(output_dir, exist_ok=True)
-    file_path = os.path.join(output_dir, f"chunk_{chunk_index:06d}.wav")
+    file_path = os.path.join(output_dir, f"chunk_{chunk_index}.wav")
     with open(file_path, "wb") as wav_file:
         wav_file.write(wav_bytes)
     return file_path
@@ -352,10 +393,10 @@ def transcribe_worker(
             continue
 
         try:
-            rms, peak =  compute_levels(audio)
-            print(f"[chunk {chunk_index}] level: rms={rms:.6f}, peak={peak:.6f}")
-            if peak < 0.005:
-                print("[warn] very low input level detected; check mic device/gain/mute")
+            rms, peak = compute_levels(audio)
+            print(f"[{chunk_index} chunk] at {time.strftime('%H:%M:%S')} level: rms={rms:.6f}, peak={peak:.6f}")
+            if peak < args.peak_threshold:
+                print(f"[{chunk_index} chunk][warn] at {time.strftime('%H:%M:%S')} very low input level detected; check mic device/gain/mute")
                 result_queue.put(
                     TranscriptionResult(
                         chunk_index=chunk_index,
@@ -369,10 +410,33 @@ def transcribe_worker(
                 )
                 continue
 
-            wav_bytes = to_wav_bytes(audio, args.sample_rate, args.channels)
+            if args.noise_reduction_enabled:
+                processed_audio = denoise_speech_chunk(audio, args.sample_rate)
+            else:
+                processed_audio = np.asarray(audio, dtype=np.float32)
+
+            rms, peak = compute_levels(processed_audio)
+            print(f"[{chunk_index} chunk][noiseredused] at {time.strftime('%H:%M:%S')} level: rms={rms:.6f}, peak={peak:.6f}")
+            if peak < args.denoised_peak_threshold:
+                print(f"[{chunk_index} chunk][noiseredused][warn] at {time.strftime('%H:%M:%S')} very low input level detected; check mic device/gain/mute")
+                result_queue.put(
+                    TranscriptionResult(
+                        chunk_index=chunk_index,
+                        worker_id=worker_id,
+                        status_code=0,
+                        elapsed_seconds=0.0,
+                        payload={"message": ""},
+                        raw_response_text="",
+                        transcript_text="",
+                    )
+                )
+                continue
+
+            wav_bytes = to_wav_bytes(processed_audio, args.sample_rate, args.channels)
             if args.save:
-                saved_path = save_chunk_wav(args.output_dir, chunk_index, wav_bytes)
-                print(f"[chunk {chunk_index}] saved={saved_path}")
+                chunk_index_time=time.strftime('%H%M%S')+'_'+str(chunk_index) + f'_{rms:.6f}_{peak:.6f}'
+                saved_path = save_chunk_wav(args.output_dir, chunk_index_time, wav_bytes)
+                print(f"[{chunk_index} chunk][save] at {time.strftime('%H:%M:%S')} saved={saved_path} ")
 
             started = time.time()
             response = send_for_transcription(args.url, wav_bytes, args.timeout)
@@ -480,6 +544,17 @@ def main() -> None:
         help="Save each recorded chunk to WAV before sending",
     )
     parser.add_argument(
+        "--noise-reduction",
+        nargs="?",
+        const=f"{DEFAULT_PEAK_THRESHOLD}/{DEFAULT_PEAK_NOISEREDU_THRESHOLD}",
+        default=None,
+        metavar="RAW_PEAK/DENOISED_PEAK",
+        help=(
+            "Enable noisereduce and optionally set input thresholds in RAW_PEAK/DENOISED_PEAK "
+            f"format (default when enabled: {DEFAULT_PEAK_THRESHOLD}/{DEFAULT_PEAK_NOISEREDU_THRESHOLD})"
+        ),
+    )
+    parser.add_argument(
         "--input-device",
         default=None,
         help="Input device index or name (use --list-devices to discover)",
@@ -538,6 +613,21 @@ def main() -> None:
     if args.tts_speed <= 0:
         print("[error] --tts-speed must be > 0")
         return
+
+    noise_reduction_enabled = args.noise_reduction is not None
+    peak_threshold = DEFAULT_PEAK_THRESHOLD
+    denoised_peak_threshold = DEFAULT_PEAK_NOISEREDU_THRESHOLD
+    if noise_reduction_enabled:
+        try:
+            peak_threshold, denoised_peak_threshold = parse_noise_reduction_thresholds(args.noise_reduction)
+        except ValueError as exc:
+            print(f"[error] invalid --noise-reduction value: {exc}")
+            print("[hint] use --noise-reduction RAW_PEAK/DENOISED_PEAK, example: --noise-reduction 0.07/0.03")
+            return
+
+    args.noise_reduction_enabled = noise_reduction_enabled
+    args.peak_threshold = peak_threshold
+    args.denoised_peak_threshold = denoised_peak_threshold
 
     tts_url = resolve_tts_url(args.url, args.tts_url)
     ask_url = resolve_ask_url(args.url, args.ask_url)
@@ -608,7 +698,9 @@ def main() -> None:
         f"[start] audio={args.sample_rate}Hz, channels={args.channels}, "
         f"chunk={args.chunk_seconds:.3f}s, step_ms={args.step_ms}, "
         f"overlap~{overlap_seconds_effective:.3f}s, workers={args.workers}, "
-        f"tts={tts_url}, ask={ask_url}, gemini={'off' if args.no_gemini else 'on'}"
+        f"tts={tts_url}, ask={ask_url}, gemini={'off' if args.no_gemini else 'on'}, "
+        f"noise_reduction={'on' if args.noise_reduction_enabled else 'off'}, "
+        f"peak_thresholds={args.peak_threshold:.3f}/{args.denoised_peak_threshold:.3f}"
     )
     print("[info] Session keywords: start/старт to begin, end/стоп to finalize")
     print("[info] Press Ctrl+C to stop.")
@@ -660,14 +752,15 @@ def main() -> None:
 
             while next_chunk in pending_results:
                 ordered_result = pending_results.pop(next_chunk)
-                print(
-                    f"\n[chunk {ordered_result.chunk_index}] worker={ordered_result.worker_id} "
-                    f"status={ordered_result.status_code} ({ordered_result.elapsed_seconds:.2f}s)"
-                )
-                if ordered_result.payload is not None:
-                    print(json.dumps(ordered_result.payload, indent=2, ensure_ascii=False))
-                else:
-                    print(ordered_result.raw_response_text)
+                if ordered_result.transcript_text != "":
+                    print(
+                        f"\n[chunk {ordered_result.chunk_index}] worker={ordered_result.worker_id} "
+                        f"status={ordered_result.status_code} ({ordered_result.elapsed_seconds:.2f}s)"
+                    )
+                    if ordered_result.payload is not None:
+                        print(json.dumps(ordered_result.payload, indent=2, ensure_ascii=False))
+                    else:
+                        print(ordered_result.raw_response_text)
 
                 transcript_text = ordered_result.transcript_text
                 started, stopped, _, finalized_text = session_state.handle_transcript(transcript_text)

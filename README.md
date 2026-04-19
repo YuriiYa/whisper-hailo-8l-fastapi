@@ -241,7 +241,7 @@ If `--save` is provided, it also saves each chunk to a local WAV file.
 
 ### Install dependencies
 ```shell
-pip install requests numpy sounddevice
+pip install requests numpy sounddevice noisereduce
 ```
 
 ### Run
@@ -280,6 +280,13 @@ python ./client/talk.transkribe.py --chunk-seconds 10
 - `--no-gemini`: skip `/ask` and speak finalized text directly
 - `--tts-voice`: voice passed to `/tts` (default: `uk`)
 - `--tts-speed`: speed passed to `/tts` (default: `170`)
+- `--noise-reduction [RAW_PEAK/DENOISED_PEAK]`: enable `noisereduce` spectral gating before sending each chunk to `/transcribe`; optionally set low-level peak thresholds (example: `0.07/0.03`)
+
+Noise reduction note:
+- `--noise-reduction` (without value) enables denoise and uses defaults: `0.07/0.03`.
+- `--noise-reduction 0.07/0.03` enables denoise with custom thresholds in `RAW_PEAK/DENOISED_PEAK` format.
+- If `--noise-reduction` is omitted, denoise is disabled.
+- This usually improves recognition in steady fan/hum/room-noise conditions, but adds some CPU cost and can soften quiet consonants.
 
 ### Examples
 
@@ -296,6 +303,12 @@ python ./client/talk.transkribe.py \
 
 # Disable Gemini and speak only captured final text
 python ./client/talk.transkribe.py --no-gemini
+
+# Enable per-chunk denoise before transcription (uses defaults: 0.07/0.03)
+python ./client/talk.transkribe.py --noise-reduction
+
+# Enable denoise with custom raw/denoised peak thresholds
+python ./client/talk.transkribe.py --noise-reduction 0.07/0.03
 
 # Interactive device selection
 python ./client/talk.transkribe.py --chunk-seconds 10
@@ -369,10 +382,27 @@ Is fixed by running
 ## Future
 
 
-Impmenet `ukrainian-tts (robinhad)`
+Impmenet `ukrainian-tts (robinhad)` support Linux(x86/ARM)
 Pure Python, ESPNET-based, MIT license
 Multiple voices (Oleksa, Dmytro, etc.) with automatic stress placement
 Explicitly supports Linux ARM in README
 Install: pip install git+https://github.com/robinhad/ukrainian-tts.git
 Heavier than Piper (loads ESPNET models), but higher quality synthesis
 237 stars, active Ukrainian community
+Install using:
+
+`!pip install git+https://github.com/robinhad/ukrainian-tts.git`
+
+Code example:
+
+```py
+from ukrainian_tts.tts import TTS, Voices, Stress
+import IPython.display as ipd
+
+tts = TTS(device="cpu") # can try gpu, mps
+with open("test.wav", mode="wb") as file:
+    _, output_text = tts.tts("Ukrainian text", Voices.Dmytro.value, Stress.Dictionary.value, file)
+print("Accented text:", output_text)
+
+ipd.Audio(filename="test.wav")
+```
